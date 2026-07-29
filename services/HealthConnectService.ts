@@ -110,12 +110,13 @@ export class HealthConnectService {
 
       const sessions = (sessionsResult.records as unknown as ExerciseSessionRecord[]) || [];
 
-      // Fetch sub-records for each session in parallel
+      // Fetch sub-records for each session in parallel, filtered by session dataOrigin
       const detailedSessions: DetailedWorkoutSession[] = await Promise.all(
         sessions.map(async (session) => {
           const subRecords = await this.fetchSubRecordsForTimeRange(
             session.startTime,
-            session.endTime
+            session.endTime,
+            session.metadata?.dataOrigin
           );
           return {
             session,
@@ -132,16 +133,23 @@ export class HealthConnectService {
   }
 
   /**
-   * Helper to fetch child metric records (HeartRate, Distance, Speed, Calories) for a session duration.
+   * Helper to fetch child metric records (HeartRate, Distance, Speed, Calories) for a session duration,
+   * filtered specifically by the session's dataOrigin package.
    */
   private async fetchSubRecordsForTimeRange(
     startTime: string,
-    endTime: string
+    endTime: string,
+    dataOrigin?: string
   ): Promise<WorkoutSubRecords> {
     const timeFilter = {
       operator: 'between' as const,
       startTime,
       endTime,
+    };
+
+    const options = {
+      timeRangeFilter: timeFilter,
+      ...(dataOrigin ? { dataOriginFilter: [dataOrigin] } : {}),
     };
 
     const [
@@ -151,33 +159,38 @@ export class HealthConnectService {
       totalCaloriesRes,
       activeCaloriesRes,
     ] = await Promise.allSettled([
-      readRecords('HeartRate', { timeRangeFilter: timeFilter }),
-      readRecords('Distance', { timeRangeFilter: timeFilter }),
-      readRecords('Speed', { timeRangeFilter: timeFilter }),
-      readRecords('TotalCaloriesBurned', { timeRangeFilter: timeFilter }),
-      readRecords('ActiveCaloriesBurned', { timeRangeFilter: timeFilter }),
+      readRecords('HeartRate', options),
+      readRecords('Distance', options),
+      readRecords('Speed', options),
+      readRecords('TotalCaloriesBurned', options),
+      readRecords('ActiveCaloriesBurned', options),
     ]);
+
+    const filterByOrigin = <T extends { metadata?: { dataOrigin?: string } }>(records: T[]): T[] => {
+      if (!dataOrigin) return records;
+      return records.filter((r) => !r.metadata?.dataOrigin || r.metadata?.dataOrigin === dataOrigin);
+    };
 
     return {
       heartRateRecords:
         heartRateRes.status === 'fulfilled'
-          ? (heartRateRes.value.records as unknown as HeartRateRecord[])
+          ? filterByOrigin(heartRateRes.value.records as unknown as HeartRateRecord[])
           : [],
       distanceRecords:
         distanceRes.status === 'fulfilled'
-          ? (distanceRes.value.records as unknown as DistanceRecord[])
+          ? filterByOrigin(distanceRes.value.records as unknown as DistanceRecord[])
           : [],
       speedRecords:
         speedRes.status === 'fulfilled'
-          ? (speedRes.value.records as unknown as SpeedRecord[])
+          ? filterByOrigin(speedRes.value.records as unknown as SpeedRecord[])
           : [],
       totalCaloriesRecords:
         totalCaloriesRes.status === 'fulfilled'
-          ? (totalCaloriesRes.value.records as unknown as TotalCaloriesBurnedRecord[])
+          ? filterByOrigin(totalCaloriesRes.value.records as unknown as TotalCaloriesBurnedRecord[])
           : [],
       activeCaloriesRecords:
         activeCaloriesRes.status === 'fulfilled'
-          ? (activeCaloriesRes.value.records as unknown as ActiveCaloriesBurnedRecord[])
+          ? filterByOrigin(activeCaloriesRes.value.records as unknown as ActiveCaloriesBurnedRecord[])
           : [],
     };
   }

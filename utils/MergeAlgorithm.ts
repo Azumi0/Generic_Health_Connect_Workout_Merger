@@ -102,23 +102,37 @@ function buildConflictGroup(
  * Pure function that generates the payload for inserting a merged master workout session
  * and its aggregated sub-records, as well as the list of original session IDs to delete.
  *
- * @param group The conflict group containing overlapping sessions to merge.
+ * @param group The conflict group containing overlapping sessions.
+ * @param selectedSessionIds Optional list of session IDs selected by user for merging.
  */
 export function generateMergedWorkoutPayload(
-  group: WorkoutConflictGroup
+  group: WorkoutConflictGroup,
+  selectedSessionIds?: string[]
 ): MergedWorkoutPayload {
-  const { sessions, earliestStartTime, latestEndTime, exerciseType } = group;
+  const sessionsToMerge = selectedSessionIds
+    ? group.sessions.filter((s, index) => {
+        const id = s.session.metadata?.id || `sess_${index}`;
+        return selectedSessionIds.includes(id);
+      })
+    : group.sessions;
 
-  if (sessions.length === 0) {
-    throw new Error('Cannot merge an empty workout group');
+  if (sessionsToMerge.length === 0) {
+    throw new Error('Cannot merge an empty selection of workouts');
   }
 
+  // Calculate overall start and end time based on selected sessions
+  const startTimes = sessionsToMerge.map((s) => new Date(s.session.startTime).getTime());
+  const endTimes = sessionsToMerge.map((s) => new Date(s.session.endTime).getTime());
+  const earliestStartTime = new Date(Math.min(...startTimes)).toISOString();
+  const latestEndTime = new Date(Math.max(...endTimes)).toISOString();
+  const exerciseType = sessionsToMerge[0].session.exerciseType;
+
   // Pick title: take first non-empty title or generate fallback
-  const existingTitle = sessions.find((s) => s.session.title?.trim())?.session.title;
-  const title = existingTitle || `Merged Workout (${sessions.length} sessions)`;
+  const existingTitle = sessionsToMerge.find((s) => s.session.title?.trim())?.session.title;
+  const title = existingTitle || `Merged Workout (${sessionsToMerge.length} sessions)`;
 
   // Combine notes/descriptions if present
-  const notes = sessions
+  const notes = sessionsToMerge
     .map((s) => s.session.notes)
     .filter((n): n is string => Boolean(n && n.trim()))
     .join(' | ');
@@ -133,14 +147,14 @@ export function generateMergedWorkoutPayload(
     notes: notes || undefined,
   };
 
-  // 2. Aggregate and clean sub-records across all sessions in group
+  // 2. Aggregate and clean sub-records across selected sessions
   const rawHeartRate: HeartRateRecord[] = [];
   const rawDistance: DistanceRecord[] = [];
   const rawSpeed: SpeedRecord[] = [];
   const rawTotalCalories: TotalCaloriesBurnedRecord[] = [];
   const rawActiveCalories: ActiveCaloriesBurnedRecord[] = [];
 
-  for (const item of sessions) {
+  for (const item of sessionsToMerge) {
     rawHeartRate.push(...item.subRecords.heartRateRecords);
     rawDistance.push(...item.subRecords.distanceRecords);
     rawSpeed.push(...item.subRecords.speedRecords);
@@ -155,8 +169,8 @@ export function generateMergedWorkoutPayload(
   const totalCaloriesToInsert = deduplicateTimeRangeRecords(rawTotalCalories);
   const activeCaloriesToInsert = deduplicateTimeRangeRecords(rawActiveCalories);
 
-  // 3. Collect IDs of original duplicate sessions to delete
-  const originalSessionIdsToDelete = sessions
+  // 3. Collect IDs of selected original duplicate sessions to delete
+  const originalSessionIdsToDelete = sessionsToMerge
     .map((s) => s.session.metadata?.id)
     .filter((id): id is string => Boolean(id));
 

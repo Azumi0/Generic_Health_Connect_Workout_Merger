@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Card,
   Text,
@@ -11,11 +11,18 @@ import {
   Surface,
   useTheme,
   Snackbar,
+  Checkbox,
 } from 'react-native-paper';
 import { format } from 'date-fns';
 import { WorkoutConflictGroup } from '../types';
 import { generateMergedWorkoutPayload } from '../utils/MergeAlgorithm';
 import { healthConnectService } from '../services/HealthConnectService';
+import {
+  formatAppOrigin,
+  calculateAvgHeartRate,
+  calculateTotalDistance,
+  calculateTotalCalories,
+} from '../utils/FormatUtils';
 
 interface SessionListProps {
   groups: WorkoutConflictGroup[];
@@ -23,6 +30,137 @@ interface SessionListProps {
   onRefresh: () => void;
   onMergeSuccess: (groupId: string) => void;
 }
+
+interface ConflictCardProps {
+  group: WorkoutConflictGroup;
+  isMerging: boolean;
+  onMergeGroup: (group: WorkoutConflictGroup, selectedSessionIds: string[]) => void;
+}
+
+const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGroup }) => {
+  const theme = useTheme();
+
+  // Helper to retrieve or generate a unique ID for each session in group
+  const getSessionId = (item: WorkoutConflictGroup['sessions'][0], index: number) =>
+    item.session.metadata?.id || `sess_${index}`;
+
+  // Default to selecting ALL session IDs in the conflict group
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() =>
+    group.sessions.map(getSessionId)
+  );
+
+  useEffect(() => {
+    setSelectedSessionIds(group.sessions.map(getSessionId));
+  }, [group]);
+
+  const toggleSessionSelection = (id: string) => {
+    if (selectedSessionIds.includes(id)) {
+      setSelectedSessionIds(selectedSessionIds.filter((sId) => sId !== id));
+    } else {
+      setSelectedSessionIds([...selectedSessionIds, id]);
+    }
+  };
+
+  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm');
+  const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm');
+  const selectedCount = selectedSessionIds.length;
+
+  return (
+    <Card style={styles.card} mode="outlined">
+      <Card.Title
+        title={`${startTimeFormatted} - ${endTimeFormatted}`}
+        titleStyle={styles.cardTitle}
+        subtitle={`Overlap of ${group.sessions.length} workouts (${selectedCount} selected)`}
+        right={() => (
+          <Chip icon="alert-circle" style={styles.conflictChip} textStyle={{ color: theme.colors.onErrorContainer }}>
+            Conflict
+          </Chip>
+        )}
+      />
+      <Card.Content>
+        {group.hasMultipleExerciseTypes && (
+          <Chip compact icon="help-circle" style={styles.typeWarningChip}>
+            Mixed Exercise Types Detected
+          </Chip>
+        )}
+
+        <Divider style={styles.divider} />
+
+        {group.sessions.map((item, index) => {
+          const sessId = getSessionId(item, index);
+          const isSelected = selectedSessionIds.includes(sessId);
+          const sessStart = format(new Date(item.session.startTime), 'HH:mm:ss');
+          const sessEnd = format(new Date(item.session.endTime), 'HH:mm:ss');
+          const appName = formatAppOrigin(item.session.metadata?.dataOrigin);
+
+          const hrVal = calculateAvgHeartRate(item.subRecords.heartRateRecords);
+          const distVal = calculateTotalDistance(item.subRecords.distanceRecords);
+          const calVal = calculateTotalCalories(
+            item.subRecords.totalCaloriesRecords,
+            item.subRecords.activeCaloriesRecords
+          );
+
+          return (
+            <View key={sessId} style={styles.sessionItem}>
+              <View style={styles.sessionRow}>
+                <Checkbox.Android
+                  status={isSelected ? 'checked' : 'unchecked'}
+                  onPress={() => toggleSessionSelection(sessId)}
+                />
+                <View style={styles.sessionMainInfo}>
+                  <View style={styles.sessionHeader}>
+                    <Text variant="titleMedium" style={styles.sessionTitle}>
+                      {item.session.title || `Workout #${index + 1}`}
+                    </Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
+                      {sessStart} - {sessEnd}
+                    </Text>
+                  </View>
+
+                  <Text variant="bodySmall" style={[styles.appSourceText, { color: theme.colors.primary }]}>
+                    App: {appName}
+                  </Text>
+
+                  {item.session.notes ? (
+                    <Text variant="bodyMedium" style={styles.notes}>
+                      {item.session.notes}
+                    </Text>
+                  ) : null}
+
+                  <View style={styles.badgeRow}>
+                    <Chip compact icon="heart-pulse" style={styles.metricBadge}>
+                      HR: {hrVal}
+                    </Chip>
+                    <Chip compact icon="map-marker-distance" style={styles.metricBadge}>
+                      Dist: {distVal}
+                    </Chip>
+                    <Chip compact icon="fire" style={styles.metricBadge}>
+                      Cal: {calVal}
+                    </Chip>
+                  </View>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </Card.Content>
+
+      <Card.Actions style={styles.cardActions}>
+        <Button
+          mode="contained"
+          icon="merge"
+          loading={isMerging}
+          disabled={isMerging || selectedCount < 2}
+          onPress={() => onMergeGroup(group, selectedSessionIds)}
+        >
+          {selectedCount < 2
+            ? 'Select at least 2 to merge'
+            : `Merge ${selectedCount} Workouts`}
+        </Button>
+      </Card.Actions>
+    </Card>
+  );
+};
 
 export const SessionList: React.FC<SessionListProps> = ({
   groups,
@@ -37,99 +175,18 @@ export const SessionList: React.FC<SessionListProps> = ({
   const conflicts = groups.filter((g: WorkoutConflictGroup) => g.status === 'conflict_detected');
   const cleanSessions = groups.filter((g: WorkoutConflictGroup) => g.status !== 'conflict_detected');
 
-  const handleMergeGroup = async (group: WorkoutConflictGroup) => {
+  const handleMergeGroup = async (group: WorkoutConflictGroup, selectedSessionIds: string[]) => {
     try {
       setMergingGroupId(group.id);
-      const payload = generateMergedWorkoutPayload(group);
+      const payload = generateMergedWorkoutPayload(group, selectedSessionIds);
       await healthConnectService.executeMerge(payload);
-      setSnackbarMessage(`Successfully merged ${group.sessions.length} workouts into one!`);
+      setSnackbarMessage(`Successfully merged ${selectedSessionIds.length} workouts into one!`);
       onMergeSuccess(group.id);
     } catch (error: any) {
       setSnackbarMessage(`Merge failed: ${error.message || 'Unknown error'}`);
     } finally {
       setMergingGroupId(null);
     }
-  };
-
-  const renderConflictCard = (group: WorkoutConflictGroup) => {
-    const isMerging = mergingGroupId === group.id;
-    const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm');
-    const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm');
-
-    return (
-      <Card style={styles.card} mode="outlined" key={group.id}>
-        <Card.Title
-          title={`${startTimeFormatted} - ${endTimeFormatted}`}
-          titleStyle={styles.cardTitle}
-          subtitle={`Overlap of ${group.sessions.length} workouts`}
-          right={(props: any) => (
-            <Chip icon="alert-circle" style={styles.conflictChip} textStyle={{ color: theme.colors.onErrorContainer }}>
-              Conflict
-            </Chip>
-          )}
-        />
-        <Card.Content>
-          {group.hasMultipleExerciseTypes && (
-            <Chip compact icon="help-circle" style={styles.typeWarningChip}>
-              Mixed Exercise Types Detected
-            </Chip>
-          )}
-
-          <Divider style={styles.divider} />
-
-          {group.sessions.map((item, index) => {
-            const sessStart = format(new Date(item.session.startTime), 'HH:mm:ss');
-            const sessEnd = format(new Date(item.session.endTime), 'HH:mm:ss');
-            const hrCount = item.subRecords.heartRateRecords.length;
-            const distCount = item.subRecords.distanceRecords.length;
-            const calCount = item.subRecords.totalCaloriesRecords.length;
-
-            return (
-              <View key={item.session.metadata?.id || index} style={styles.sessionItem}>
-                <View style={styles.sessionHeader}>
-                  <Text variant="titleMedium" style={styles.sessionTitle}>
-                    {item.session.title || `Workout #${index + 1}`}
-                  </Text>
-                  <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
-                    {sessStart} - {sessEnd}
-                  </Text>
-                </View>
-
-                {item.session.notes ? (
-                  <Text variant="bodyMedium" style={styles.notes}>
-                    {item.session.notes}
-                  </Text>
-                ) : null}
-
-                <View style={styles.badgeRow}>
-                  <Chip compact icon="heart-pulse" style={styles.metricBadge}>
-                    HR: {hrCount}
-                  </Chip>
-                  <Chip compact icon="map-marker-distance" style={styles.metricBadge}>
-                    Dist: {distCount}
-                  </Chip>
-                  <Chip compact icon="fire" style={styles.metricBadge}>
-                    Cal: {calCount}
-                  </Chip>
-                </View>
-              </View>
-            );
-          })}
-        </Card.Content>
-
-        <Card.Actions style={styles.cardActions}>
-          <Button
-            mode="contained"
-            icon="merge"
-            loading={isMerging}
-            disabled={isMerging}
-            onPress={() => handleMergeGroup(group)}
-          >
-            Merge {group.sessions.length} Workouts
-          </Button>
-        </Card.Actions>
-      </Card>
-    );
   };
 
   if (loading) {
@@ -149,7 +206,10 @@ export const SessionList: React.FC<SessionListProps> = ({
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
               Detected Conflicts
             </Text>
-            <Text variant="headlineMedium" style={{ color: conflicts.length > 0 ? theme.colors.error : theme.colors.primary }}>
+            <Text
+              variant="headlineMedium"
+              style={{ color: conflicts.length > 0 ? theme.colors.error : theme.colors.primary }}
+            >
               {conflicts.length}
             </Text>
           </View>
@@ -181,7 +241,14 @@ export const SessionList: React.FC<SessionListProps> = ({
           <Text variant="titleMedium" style={styles.sectionHeader}>
             Overlapping Workouts ({conflicts.length})
           </Text>
-          {conflicts.map(renderConflictCard)}
+          {conflicts.map((group) => (
+            <ConflictCard
+              key={group.id}
+              group={group}
+              isMerging={mergingGroupId === group.id}
+              onMergeGroup={handleMergeGroup}
+            />
+          ))}
         </ScrollView>
       )}
 
@@ -254,9 +321,17 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   sessionItem: {
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  sessionMainInfo: {
+    flex: 1,
+    marginLeft: 4,
   },
   sessionHeader: {
     flexDirection: 'row',
@@ -264,6 +339,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sessionTitle: {
+    fontWeight: '600',
+    flex: 1,
+  },
+  appSourceText: {
+    marginTop: 2,
     fontWeight: '600',
   },
   notes: {
@@ -273,6 +353,7 @@ const styles = StyleSheet.create({
   },
   badgeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: 8,
     gap: 6,
   },
