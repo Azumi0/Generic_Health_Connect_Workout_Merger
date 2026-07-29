@@ -14,7 +14,13 @@ import {
   Checkbox,
 } from 'react-native-paper';
 import { format } from 'date-fns';
-import { WorkoutConflictGroup } from '../types';
+import {
+  WorkoutConflictGroup,
+  ActivityCategory,
+  MergedWorkoutSession,
+  ContributingSource,
+  MergedWorkoutPayload,
+} from '../types';
 import { generateMergedWorkoutPayload } from '../utils/MergeAlgorithm';
 import { healthConnectService } from '../services/HealthConnectService';
 import {
@@ -37,14 +43,109 @@ interface ConflictCardProps {
   onMergeGroup: (group: WorkoutConflictGroup, selectedSessionIds: string[]) => void;
 }
 
+/**
+ * Render category badge based on ActivityCategory enum and categoryLabel.
+ */
+const CategoryBadge: React.FC<{ category?: ActivityCategory; label?: string }> = ({ category, label }) => {
+  const theme = useTheme();
+
+  let icon = 'tag';
+  let backgroundColor = theme.colors.surfaceVariant;
+  let textColor = theme.colors.onSurfaceVariant;
+
+  if (category === ActivityCategory.INDOOR_MACHINE) {
+    icon = 'run-fast';
+    backgroundColor = '#E0F2FE';
+    textColor = '#0369A1';
+  } else if (category === ActivityCategory.OUTDOOR_SPATIAL) {
+    icon = 'compass';
+    backgroundColor = '#DCFCE7';
+    textColor = '#15803D';
+  } else if (category === ActivityCategory.STATIONARY_NON_DISTANCE) {
+    icon = 'dumbbell';
+    backgroundColor = '#FFE4E6';
+    textColor = '#BE123C';
+  }
+
+  return (
+    <Chip
+      icon={icon}
+      style={[styles.categoryBadge, { backgroundColor }]}
+      textStyle={[styles.categoryBadgeText, { color: textColor }]}
+      compact
+    >
+      {label || 'Workout Category'}
+    </Chip>
+  );
+};
+
+/**
+ * Renders metadata breakdown showing which device provided Distance vs. Heart Rate & Calories.
+ */
+const ContributingSourcesView: React.FC<{
+  sources: ContributingSource[];
+  mergedPreview?: MergedWorkoutSession;
+}> = ({ sources, mergedPreview }) => {
+  const theme = useTheme();
+
+  return (
+    <Surface style={styles.sourcesContainer} elevation={0}>
+      <Text variant="labelMedium" style={[styles.sourcesHeaderTitle, { color: theme.colors.primary }]}>
+        Merged Resolution & Telemetry Attribution
+      </Text>
+
+      {mergedPreview && (
+        <View style={styles.previewMetricsRow}>
+          <View style={styles.previewMetricItem}>
+            <Text variant="bodySmall" style={styles.previewMetricLabel}>Distance</Text>
+            <Text variant="titleMedium" style={styles.previewMetricValue}>
+              {mergedPreview.distanceKm > 0 ? `${mergedPreview.distanceKm} km` : '0.00 km'}
+            </Text>
+          </View>
+          <View style={styles.previewMetricDivider} />
+          <View style={styles.previewMetricItem}>
+            <Text variant="bodySmall" style={styles.previewMetricLabel}>Avg Heart Rate</Text>
+            <Text variant="titleMedium" style={styles.previewMetricValue}>
+              {mergedPreview.avgHeartRateBpm ? `${mergedPreview.avgHeartRateBpm} bpm` : '--'}
+            </Text>
+          </View>
+          <View style={styles.previewMetricDivider} />
+          <View style={styles.previewMetricItem}>
+            <Text variant="bodySmall" style={styles.previewMetricLabel}>Calories</Text>
+            <Text variant="titleMedium" style={styles.previewMetricValue}>
+              {mergedPreview.caloriesKcal} kcal
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <Divider style={styles.sourceDivider} />
+
+      <Text variant="labelSmall" style={styles.sourcesSubLabel}>
+        Metric Hierarchy Resolution:
+      </Text>
+      <View style={styles.sourcesChipList}>
+        {sources.map((cs, idx) => (
+          <View key={idx} style={styles.sourcePill}>
+            <Text variant="labelSmall" style={styles.sourceMetricName}>
+              {cs.metric}:
+            </Text>
+            <Text variant="bodySmall" style={styles.sourceAppName}>
+              {cs.source}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </Surface>
+  );
+};
+
 const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGroup }) => {
   const theme = useTheme();
 
-  // Helper to retrieve or generate a unique ID for each session in group
   const getSessionId = (item: WorkoutConflictGroup['sessions'][0], index: number) =>
     item.session.metadata?.id || `sess_${index}`;
 
-  // Default to selecting ALL session IDs in the conflict group
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() =>
     group.sessions.map(getSessionId)
   );
@@ -61,9 +162,23 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
     }
   };
 
+  let currentPayload: MergedWorkoutPayload | null = null;
+  try {
+    if (selectedSessionIds.length > 0) {
+      currentPayload = generateMergedWorkoutPayload(group, selectedSessionIds);
+    }
+  } catch {
+    currentPayload = null;
+  }
+
   const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm');
   const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm');
   const selectedCount = selectedSessionIds.length;
+
+  const category = currentPayload?.mergedSummary.detectedCategory || group.detectedCategory;
+  const categoryLabel = currentPayload?.mergedSummary.categoryLabel || group.categoryLabel || 'Conflict';
+  const sources = currentPayload?.mergedSummary.contributingSources || [];
+  const mergedPreview = currentPayload?.mergedSummary;
 
   return (
     <Card style={styles.card} mode="outlined">
@@ -72,19 +187,28 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
         titleStyle={styles.cardTitle}
         subtitle={`Overlap of ${group.sessions.length} workouts (${selectedCount} selected)`}
         right={() => (
-          <Chip icon="alert-circle" style={styles.conflictChip} textStyle={{ color: theme.colors.onErrorContainer }}>
-            Conflict
-          </Chip>
+          <View style={styles.headerBadgeContainer}>
+            <CategoryBadge category={category} label={categoryLabel} />
+          </View>
         )}
       />
       <Card.Content>
         {group.hasMultipleExerciseTypes && (
-          <Chip compact icon="help-circle" style={styles.typeWarningChip}>
+          <Chip compact icon="alert-decagram" style={styles.typeWarningChip}>
             Mixed Exercise Types Detected
           </Chip>
         )}
 
+        {/* Contributing Sources & Merged Preview Box */}
+        {sources.length > 0 && (
+          <ContributingSourcesView sources={sources} mergedPreview={mergedPreview} />
+        )}
+
         <Divider style={styles.divider} />
+
+        <Text variant="labelMedium" style={styles.sessionsSubHeader}>
+          Select Sessions to Deduplicate:
+        </Text>
 
         {group.sessions.map((item, index) => {
           const sessId = getSessionId(item, index);
@@ -118,7 +242,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
                   </View>
 
                   <Text variant="bodySmall" style={[styles.appSourceText, { color: theme.colors.primary }]}>
-                    App: {appName}
+                    Source: {appName}
                   </Text>
 
                   {item.session.notes ? (
@@ -180,7 +304,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       setMergingGroupId(group.id);
       const payload = generateMergedWorkoutPayload(group, selectedSessionIds);
       await healthConnectService.executeMerge(payload);
-      setSnackbarMessage(`Successfully merged ${selectedSessionIds.length} workouts into one!`);
+      setSnackbarMessage(`Successfully merged ${selectedSessionIds.length} workouts into ${payload.mergedSummary.categoryLabel}!`);
       onMergeSuccess(group.id);
     } catch (error: any) {
       setSnackbarMessage(`Merge failed: ${error.message || 'Unknown error'}`);
@@ -308,17 +432,99 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontWeight: '700',
   },
-  conflictChip: {
-    marginRight: 16,
-    backgroundColor: '#FFDAD6',
+  headerBadgeContainer: {
+    marginRight: 12,
+    justifyContent: 'center',
+  },
+  categoryBadge: {
+    height: 32,
+  },
+  categoryBadgeText: {
+    fontWeight: '700',
+    fontSize: 12,
   },
   typeWarningChip: {
-    marginBottom: 8,
+    marginBottom: 12,
     alignSelf: 'flex-start',
     backgroundColor: '#FFDCC3',
   },
+  sourcesContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sourcesHeaderTitle: {
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  previewMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  previewMetricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  previewMetricLabel: {
+    fontSize: 11,
+    opacity: 0.7,
+  },
+  previewMetricValue: {
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  previewMetricDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: '#E2E8F0',
+  },
+  sourceDivider: {
+    marginVertical: 10,
+  },
+  sourcesSubLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
+    opacity: 0.8,
+  },
+  sourcesChipList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sourcePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EDF2F7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  sourceMetricName: {
+    fontWeight: '700',
+    marginRight: 4,
+    color: '#475569',
+  },
+  sourceAppName: {
+    fontWeight: '500',
+    color: '#0F172A',
+  },
   divider: {
     marginVertical: 10,
+  },
+  sessionsSubHeader: {
+    fontWeight: '600',
+    marginBottom: 8,
+    opacity: 0.8,
   },
   sessionItem: {
     paddingVertical: 10,
@@ -377,3 +583,4 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 });
+

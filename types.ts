@@ -102,6 +102,27 @@ export interface DetailedWorkoutSession {
   subRecords: WorkoutSubRecords;
 }
 
+export enum ActivityCategory {
+  OUTDOOR_SPATIAL = 'OUTDOOR_SPATIAL',
+  INDOOR_MACHINE = 'INDOOR_MACHINE',
+  STATIONARY_NON_DISTANCE = 'STATIONARY_NON_DISTANCE',
+}
+
+export interface ContributingSource {
+  metric: string;
+  source: string;
+}
+
+export interface MergedWorkoutSession {
+  id: string;
+  detectedCategory: ActivityCategory;
+  categoryLabel: string;
+  distanceKm: number;
+  avgHeartRateBpm: number | null;
+  caloriesKcal: number;
+  contributingSources: ContributingSource[];
+}
+
 /**
  * Parameters controlling overlap detection tolerance.
  */
@@ -124,12 +145,16 @@ export interface WorkoutConflictGroup {
   exerciseType: number;
   hasMultipleExerciseTypes: boolean;
   status: 'conflict_detected' | 'merged' | 'ignored';
+  detectedCategory?: ActivityCategory;
+  categoryLabel?: string;
+  mergedPreview?: MergedWorkoutSession;
 }
 
 /**
  * Result structure produced by the merge algorithm, ready for persistence.
  */
 export interface MergedWorkoutPayload {
+  mergedSummary: MergedWorkoutSession;
   sessionToInsert: Omit<ExerciseSessionRecord, 'metadata'>;
   heartRateToInsert: Omit<HeartRateRecord, 'metadata'>[];
   distanceToInsert: Omit<DistanceRecord, 'metadata'>[];

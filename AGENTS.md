@@ -16,6 +16,7 @@ Guiding instructions and codebase conventions for AI agents and coding assistant
 * **Add a dev dependency:** `pnpm add -D <package-name>`
 * **Execute local binaries:** `pnpm exec <command>` (e.g. `pnpm exec tsc --noEmit`)
 * **Run Expo commands:** `pnpm expo <command>` or `npx expo <command>`
+* **Run tests:** `pnpm run test`
 
 ---
 
@@ -31,9 +32,12 @@ Generic_Health_Connect_Workout_Merger/
 ├── services/
 │   └── HealthConnectService.ts    # Singleton wrapper for Google Health Connect API calls
 ├── utils/
-│   └── MergeAlgorithm.ts          # Pure overlap detection & payload aggregation functions
+│   ├── FormatUtils.ts             # Package origin formatting & metric calculations
+│   ├── MergeAlgorithm.ts          # Pure category detection, overlap clustering & payload aggregation functions
+│   └── __tests__/
+│       └── testMergeAlgorithm.ts  # Test suite for merge algorithm, category detection & noise rules
 ├── components/
-│   └── SessionList.tsx            # Material Design 3 UI component for displaying conflicts
+│   └── SessionList.tsx            # Material Design 3 UI component for displaying conflicts & metric attribution
 ├── docs/
 │   └── INITIAL_PROMPT.md          # Preserved initial specification & project prompt
 ├── AGENTS.md                      # AI agent instructions (this document)
@@ -56,10 +60,11 @@ Generic_Health_Connect_Workout_Merger/
 
 ---
 
-## 🧪 Verification & Typechecking
+## 🧪 Verification & Testing
 
-Before completing changes, verify that the TypeScript codebase compiles cleanly:
+Before completing changes, verify that the TypeScript codebase compiles cleanly and all unit tests pass:
 
 ```bash
 pnpm run typecheck
+pnpm run test
 ```
