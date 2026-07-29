@@ -10,6 +10,16 @@ import {
   SpeedRecord,
   TotalCaloriesBurnedRecord,
   ActiveCaloriesBurnedRecord,
+  StepsRecord,
+  StepsCadenceRecord,
+  ElevationGainedRecord,
+  FloorsClimbedRecord,
+  PowerRecord,
+  CyclingPedalingCadenceRecord,
+  WheelchairPushesRecord,
+  Vo2MaxRecord,
+  HeartRateVariabilityRmssdRecord,
+  RestingHeartRateRecord,
 } from 'react-native-health-connect';
 
 export const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes tolerance
@@ -147,27 +157,57 @@ export function generateMergedWorkoutPayload(
     notes: notes || undefined,
   };
 
-  // 2. Aggregate and clean sub-records across selected sessions
+  // 2. Aggregate sub-records across selected sessions
   const rawHeartRate: HeartRateRecord[] = [];
   const rawDistance: DistanceRecord[] = [];
   const rawSpeed: SpeedRecord[] = [];
   const rawTotalCalories: TotalCaloriesBurnedRecord[] = [];
   const rawActiveCalories: ActiveCaloriesBurnedRecord[] = [];
+  const rawSteps: StepsRecord[] = [];
+  const rawStepsCadence: StepsCadenceRecord[] = [];
+  const rawElevationGained: ElevationGainedRecord[] = [];
+  const rawFloorsClimbed: FloorsClimbedRecord[] = [];
+  const rawPower: PowerRecord[] = [];
+  const rawCyclingCadence: CyclingPedalingCadenceRecord[] = [];
+  const rawWheelchairPushes: WheelchairPushesRecord[] = [];
+  const rawVo2Max: Vo2MaxRecord[] = [];
+  const rawHrv: HeartRateVariabilityRmssdRecord[] = [];
+  const rawRestingHeartRate: RestingHeartRateRecord[] = [];
 
   for (const item of sessionsToMerge) {
-    rawHeartRate.push(...item.subRecords.heartRateRecords);
-    rawDistance.push(...item.subRecords.distanceRecords);
-    rawSpeed.push(...item.subRecords.speedRecords);
-    rawTotalCalories.push(...item.subRecords.totalCaloriesRecords);
-    rawActiveCalories.push(...item.subRecords.activeCaloriesRecords);
+    if (item.subRecords.heartRateRecords) rawHeartRate.push(...item.subRecords.heartRateRecords);
+    if (item.subRecords.distanceRecords) rawDistance.push(...item.subRecords.distanceRecords);
+    if (item.subRecords.speedRecords) rawSpeed.push(...item.subRecords.speedRecords);
+    if (item.subRecords.totalCaloriesRecords) rawTotalCalories.push(...item.subRecords.totalCaloriesRecords);
+    if (item.subRecords.activeCaloriesRecords) rawActiveCalories.push(...item.subRecords.activeCaloriesRecords);
+    if (item.subRecords.stepsRecords) rawSteps.push(...item.subRecords.stepsRecords);
+    if (item.subRecords.stepsCadenceRecords) rawStepsCadence.push(...item.subRecords.stepsCadenceRecords);
+    if (item.subRecords.elevationGainedRecords) rawElevationGained.push(...item.subRecords.elevationGainedRecords);
+    if (item.subRecords.floorsClimbedRecords) rawFloorsClimbed.push(...item.subRecords.floorsClimbedRecords);
+    if (item.subRecords.powerRecords) rawPower.push(...item.subRecords.powerRecords);
+    if (item.subRecords.cyclingPedalingCadenceRecords) rawCyclingCadence.push(...item.subRecords.cyclingPedalingCadenceRecords);
+    if (item.subRecords.wheelchairPushesRecords) rawWheelchairPushes.push(...item.subRecords.wheelchairPushesRecords);
+    if (item.subRecords.vo2MaxRecords) rawVo2Max.push(...item.subRecords.vo2MaxRecords);
+    if (item.subRecords.heartRateVariabilityRecords) rawHrv.push(...item.subRecords.heartRateVariabilityRecords);
+    if (item.subRecords.restingHeartRateRecords) rawRestingHeartRate.push(...item.subRecords.restingHeartRateRecords);
   }
 
-  // Strip metadata and deduplicate samples
-  const heartRateToInsert = deduplicateHeartRateRecords(rawHeartRate);
-  const distanceToInsert = deduplicateTimeRangeRecords(rawDistance);
-  const speedToInsert = deduplicateTimeRangeRecords(rawSpeed);
-  const totalCaloriesToInsert = deduplicateTimeRangeRecords(rawTotalCalories);
-  const activeCaloriesToInsert = deduplicateTimeRangeRecords(rawActiveCalories);
+  // Strip metadata and deduplicate records
+  const heartRateToInsert = deduplicateRecords(rawHeartRate);
+  const distanceToInsert = deduplicateRecords(rawDistance);
+  const speedToInsert = deduplicateRecords(rawSpeed);
+  const totalCaloriesToInsert = deduplicateRecords(rawTotalCalories);
+  const activeCaloriesToInsert = deduplicateRecords(rawActiveCalories);
+  const stepsToInsert = deduplicateRecords(rawSteps);
+  const stepsCadenceToInsert = deduplicateRecords(rawStepsCadence);
+  const elevationGainedToInsert = deduplicateRecords(rawElevationGained);
+  const floorsClimbedToInsert = deduplicateRecords(rawFloorsClimbed);
+  const powerToInsert = deduplicateRecords(rawPower);
+  const cyclingPedalingCadenceToInsert = deduplicateRecords(rawCyclingCadence);
+  const wheelchairPushesToInsert = deduplicateRecords(rawWheelchairPushes);
+  const vo2MaxToInsert = deduplicateRecords(rawVo2Max);
+  const heartRateVariabilityToInsert = deduplicateRecords(rawHrv);
+  const restingHeartRateToInsert = deduplicateRecords(rawRestingHeartRate);
 
   // 3. Collect IDs of selected original duplicate sessions to delete
   const originalSessionIdsToDelete = sessionsToMerge
@@ -181,44 +221,37 @@ export function generateMergedWorkoutPayload(
     speedToInsert,
     totalCaloriesToInsert,
     activeCaloriesToInsert,
+    stepsToInsert,
+    stepsCadenceToInsert,
+    elevationGainedToInsert,
+    floorsClimbedToInsert,
+    powerToInsert,
+    cyclingPedalingCadenceToInsert,
+    wheelchairPushesToInsert,
+    vo2MaxToInsert,
+    heartRateVariabilityToInsert,
+    restingHeartRateToInsert,
     originalSessionIdsToDelete,
   };
 }
 
 /**
- * Deduplicates HeartRate records by startTime.
+ * Strips metadata and deduplicates Health Connect records by timestamp key.
  */
-function deduplicateHeartRateRecords(
-  records: HeartRateRecord[]
-): Omit<HeartRateRecord, 'metadata'>[] {
-  const seenTimes = new Set<string>();
-  const result: Omit<HeartRateRecord, 'metadata'>[] = [];
-
-  for (const rec of records) {
-    const key = `${rec.startTime}_${rec.endTime}`;
-    if (!seenTimes.has(key)) {
-      seenTimes.add(key);
-      const { metadata, ...cleanRecord } = rec;
-      result.push({ ...cleanRecord, recordType: 'HeartRate' as const });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Deduplicates generic time-range records (Distance, Speed, Calories) by startTime and endTime.
- */
-function deduplicateTimeRangeRecords<T extends { startTime: string; endTime: string; metadata?: any; recordType: any }>(
+function deduplicateRecords<T extends { metadata?: any }>(
   records: T[]
 ): Omit<T, 'metadata'>[] {
-  const seenRanges = new Set<string>();
+  const seenKeys = new Set<string>();
   const result: Omit<T, 'metadata'>[] = [];
 
   for (const rec of records) {
-    const key = `${rec.startTime}_${rec.endTime}`;
-    if (!seenRanges.has(key)) {
-      seenRanges.add(key);
+    const timeKey =
+      (rec as any).startTime && (rec as any).endTime
+        ? `${(rec as any).startTime}_${(rec as any).endTime}`
+        : `${(rec as any).time}`;
+
+    if (!seenKeys.has(timeKey)) {
+      seenKeys.add(timeKey);
       const { metadata, ...cleanRecord } = rec;
       result.push(cleanRecord as Omit<T, 'metadata'>);
     }

@@ -5,26 +5,73 @@ import type {
   SpeedRecord,
   TotalCaloriesBurnedRecord,
   ActiveCaloriesBurnedRecord,
+  StepsRecord,
+  StepsCadenceRecord,
+  ElevationGainedRecord,
+  FloorsClimbedRecord,
+  PowerRecord,
+  CyclingPedalingCadenceRecord,
+  WheelchairPushesRecord,
+  Vo2MaxRecord,
+  HeartRateVariabilityRmssdRecord,
+  RestingHeartRateRecord,
   Permission,
+  RecordType,
 } from 'react-native-health-connect';
 
 /**
- * Health Connect permissions required by the application.
+ * List of all Health Connect record types supported by react-native-health-connect.
  */
-export const REQUIRED_HEALTH_PERMISSIONS: Permission[] = [
-  { accessType: 'read', recordType: 'ExerciseSession' },
-  { accessType: 'write', recordType: 'ExerciseSession' },
-  { accessType: 'read', recordType: 'HeartRate' },
-  { accessType: 'write', recordType: 'HeartRate' },
-  { accessType: 'read', recordType: 'Distance' },
-  { accessType: 'write', recordType: 'Distance' },
-  { accessType: 'read', recordType: 'Speed' },
-  { accessType: 'write', recordType: 'Speed' },
-  { accessType: 'read', recordType: 'TotalCaloriesBurned' },
-  { accessType: 'write', recordType: 'TotalCaloriesBurned' },
-  { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
-  { accessType: 'write', recordType: 'ActiveCaloriesBurned' },
+const ALL_HEALTH_RECORD_TYPES: RecordType[] = [
+  'ActiveCaloriesBurned',
+  'BasalBodyTemperature',
+  'BasalMetabolicRate',
+  'BloodGlucose',
+  'BloodPressure',
+  'BodyFat',
+  'BodyTemperature',
+  'BodyWaterMass',
+  'BoneMass',
+  'CervicalMucus',
+  'CyclingPedalingCadence',
+  'Distance',
+  'ElevationGained',
+  'ExerciseSession',
+  'FloorsClimbed',
+  'HeartRate',
+  'HeartRateVariabilityRmssd',
+  'Height',
+  'Hydration',
+  'IntermenstrualBleeding',
+  'LeanBodyMass',
+  'MenstruationFlow',
+  'MenstruationPeriod',
+  'Nutrition',
+  'OvulationTest',
+  'OxygenSaturation',
+  'Power',
+  'RespiratoryRate',
+  'RestingHeartRate',
+  'SexualActivity',
+  'SleepSession',
+  'Speed',
+  'Steps',
+  'StepsCadence',
+  'TotalCaloriesBurned',
+  'Vo2Max',
+  'Weight',
+  'WheelchairPushes',
 ];
+
+/**
+ * Comprehensive Health Connect permissions required by the application.
+ */
+export const REQUIRED_HEALTH_PERMISSIONS: Permission[] = ALL_HEALTH_RECORD_TYPES.flatMap(
+  (recordType) => [
+    { accessType: 'read', recordType },
+    { accessType: 'write', recordType },
+  ]
+);
 
 /**
  * Detailed sub-records associated with an ExerciseSession.
@@ -35,6 +82,16 @@ export interface WorkoutSubRecords {
   speedRecords: SpeedRecord[];
   totalCaloriesRecords: TotalCaloriesBurnedRecord[];
   activeCaloriesRecords: ActiveCaloriesBurnedRecord[];
+  stepsRecords: StepsRecord[];
+  stepsCadenceRecords: StepsCadenceRecord[];
+  elevationGainedRecords: ElevationGainedRecord[];
+  floorsClimbedRecords: FloorsClimbedRecord[];
+  powerRecords: PowerRecord[];
+  cyclingPedalingCadenceRecords: CyclingPedalingCadenceRecord[];
+  wheelchairPushesRecords: WheelchairPushesRecord[];
+  vo2MaxRecords: Vo2MaxRecord[];
+  heartRateVariabilityRecords: HeartRateVariabilityRmssdRecord[];
+  restingHeartRateRecords: RestingHeartRateRecord[];
 }
 
 /**
@@ -79,5 +136,15 @@ export interface MergedWorkoutPayload {
   speedToInsert: Omit<SpeedRecord, 'metadata'>[];
   totalCaloriesToInsert: Omit<TotalCaloriesBurnedRecord, 'metadata'>[];
   activeCaloriesToInsert: Omit<ActiveCaloriesBurnedRecord, 'metadata'>[];
+  stepsToInsert: Omit<StepsRecord, 'metadata'>[];
+  stepsCadenceToInsert: Omit<StepsCadenceRecord, 'metadata'>[];
+  elevationGainedToInsert: Omit<ElevationGainedRecord, 'metadata'>[];
+  floorsClimbedToInsert: Omit<FloorsClimbedRecord, 'metadata'>[];
+  powerToInsert: Omit<PowerRecord, 'metadata'>[];
+  cyclingPedalingCadenceToInsert: Omit<CyclingPedalingCadenceRecord, 'metadata'>[];
+  wheelchairPushesToInsert: Omit<WheelchairPushesRecord, 'metadata'>[];
+  vo2MaxToInsert: Omit<Vo2MaxRecord, 'metadata'>[];
+  heartRateVariabilityToInsert: Omit<HeartRateVariabilityRmssdRecord, 'metadata'>[];
+  restingHeartRateToInsert: Omit<RestingHeartRateRecord, 'metadata'>[];
   originalSessionIdsToDelete: string[];
 }

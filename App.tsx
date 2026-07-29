@@ -164,8 +164,8 @@ function App() {
               Health Connect Access Required
             </Text>
             <Text variant="bodyMedium" style={styles.permissionDesc}>
-              This app needs read and write permissions for Exercise Sessions, Heart Rate,
-              Distance, Speed, and Calories to detect and merge duplicate workouts.
+              This app requires Health Connect permissions to read and write all exercise sessions
+              and health metrics to detect and merge duplicate workouts without losing data.
             </Text>
 
             {permissionError && (

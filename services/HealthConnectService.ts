@@ -12,6 +12,16 @@ import {
   SpeedRecord,
   TotalCaloriesBurnedRecord,
   ActiveCaloriesBurnedRecord,
+  StepsRecord,
+  StepsCadenceRecord,
+  ElevationGainedRecord,
+  FloorsClimbedRecord,
+  PowerRecord,
+  CyclingPedalingCadenceRecord,
+  WheelchairPushesRecord,
+  Vo2MaxRecord,
+  HeartRateVariabilityRmssdRecord,
+  RestingHeartRateRecord,
 } from 'react-native-health-connect';
 
 import {
@@ -133,7 +143,7 @@ export class HealthConnectService {
   }
 
   /**
-   * Helper to fetch child metric records (HeartRate, Distance, Speed, Calories) for a session duration,
+   * Helper to fetch child metric records for a session duration,
    * filtered specifically by the session's dataOrigin package.
    */
   private async fetchSubRecordsForTimeRange(
@@ -158,12 +168,32 @@ export class HealthConnectService {
       speedRes,
       totalCaloriesRes,
       activeCaloriesRes,
+      stepsRes,
+      stepsCadenceRes,
+      elevationGainedRes,
+      floorsClimbedRes,
+      powerRes,
+      cyclingPedalingCadenceRes,
+      wheelchairPushesRes,
+      vo2MaxRes,
+      heartRateVariabilityRes,
+      restingHeartRateRes,
     ] = await Promise.allSettled([
       readRecords('HeartRate', options),
       readRecords('Distance', options),
       readRecords('Speed', options),
       readRecords('TotalCaloriesBurned', options),
       readRecords('ActiveCaloriesBurned', options),
+      readRecords('Steps', options),
+      readRecords('StepsCadence', options),
+      readRecords('ElevationGained', options),
+      readRecords('FloorsClimbed', options),
+      readRecords('Power', options),
+      readRecords('CyclingPedalingCadence', options),
+      readRecords('WheelchairPushes', options),
+      readRecords('Vo2Max', options),
+      readRecords('HeartRateVariabilityRmssd', options),
+      readRecords('RestingHeartRate', options),
     ]);
 
     const filterByOrigin = <T extends { metadata?: { dataOrigin?: string } }>(records: T[]): T[] => {
@@ -171,27 +201,28 @@ export class HealthConnectService {
       return records.filter((r) => !r.metadata?.dataOrigin || r.metadata?.dataOrigin === dataOrigin);
     };
 
+    const getFulfilled = <T extends { metadata?: { dataOrigin?: string } }>(
+      res: PromiseSettledResult<{ records: any[] }>
+    ): T[] => {
+      return res.status === 'fulfilled' ? filterByOrigin(res.value.records as unknown as T[]) : [];
+    };
+
     return {
-      heartRateRecords:
-        heartRateRes.status === 'fulfilled'
-          ? filterByOrigin(heartRateRes.value.records as unknown as HeartRateRecord[])
-          : [],
-      distanceRecords:
-        distanceRes.status === 'fulfilled'
-          ? filterByOrigin(distanceRes.value.records as unknown as DistanceRecord[])
-          : [],
-      speedRecords:
-        speedRes.status === 'fulfilled'
-          ? filterByOrigin(speedRes.value.records as unknown as SpeedRecord[])
-          : [],
-      totalCaloriesRecords:
-        totalCaloriesRes.status === 'fulfilled'
-          ? filterByOrigin(totalCaloriesRes.value.records as unknown as TotalCaloriesBurnedRecord[])
-          : [],
-      activeCaloriesRecords:
-        activeCaloriesRes.status === 'fulfilled'
-          ? filterByOrigin(activeCaloriesRes.value.records as unknown as ActiveCaloriesBurnedRecord[])
-          : [],
+      heartRateRecords: getFulfilled<HeartRateRecord>(heartRateRes),
+      distanceRecords: getFulfilled<DistanceRecord>(distanceRes),
+      speedRecords: getFulfilled<SpeedRecord>(speedRes),
+      totalCaloriesRecords: getFulfilled<TotalCaloriesBurnedRecord>(totalCaloriesRes),
+      activeCaloriesRecords: getFulfilled<ActiveCaloriesBurnedRecord>(activeCaloriesRes),
+      stepsRecords: getFulfilled<StepsRecord>(stepsRes),
+      stepsCadenceRecords: getFulfilled<StepsCadenceRecord>(stepsCadenceRes),
+      elevationGainedRecords: getFulfilled<ElevationGainedRecord>(elevationGainedRes),
+      floorsClimbedRecords: getFulfilled<FloorsClimbedRecord>(floorsClimbedRes),
+      powerRecords: getFulfilled<PowerRecord>(powerRes),
+      cyclingPedalingCadenceRecords: getFulfilled<CyclingPedalingCadenceRecord>(cyclingPedalingCadenceRes),
+      wheelchairPushesRecords: getFulfilled<WheelchairPushesRecord>(wheelchairPushesRes),
+      vo2MaxRecords: getFulfilled<Vo2MaxRecord>(vo2MaxRes),
+      heartRateVariabilityRecords: getFulfilled<HeartRateVariabilityRmssdRecord>(heartRateVariabilityRes),
+      restingHeartRateRecords: getFulfilled<RestingHeartRateRecord>(restingHeartRateRes),
     };
   }
 
@@ -207,24 +238,28 @@ export class HealthConnectService {
       await insertRecords([payload.sessionToInsert as ExerciseSessionRecord]);
 
       // 2. Insert sub-records (if non-empty)
-      if (payload.heartRateToInsert.length > 0) {
-        await insertRecords(payload.heartRateToInsert as HeartRateRecord[]);
-      }
+      const subRecordBatches: Array<{ name: string; records: any[] }> = [
+        { name: 'HeartRate', records: payload.heartRateToInsert },
+        { name: 'Distance', records: payload.distanceToInsert },
+        { name: 'Speed', records: payload.speedToInsert },
+        { name: 'TotalCaloriesBurned', records: payload.totalCaloriesToInsert },
+        { name: 'ActiveCaloriesBurned', records: payload.activeCaloriesToInsert },
+        { name: 'Steps', records: payload.stepsToInsert },
+        { name: 'StepsCadence', records: payload.stepsCadenceToInsert },
+        { name: 'ElevationGained', records: payload.elevationGainedToInsert },
+        { name: 'FloorsClimbed', records: payload.floorsClimbedToInsert },
+        { name: 'Power', records: payload.powerToInsert },
+        { name: 'CyclingPedalingCadence', records: payload.cyclingPedalingCadenceToInsert },
+        { name: 'WheelchairPushes', records: payload.wheelchairPushesToInsert },
+        { name: 'Vo2Max', records: payload.vo2MaxToInsert },
+        { name: 'HeartRateVariabilityRmssd', records: payload.heartRateVariabilityToInsert },
+        { name: 'RestingHeartRate', records: payload.restingHeartRateToInsert },
+      ];
 
-      if (payload.distanceToInsert.length > 0) {
-        await insertRecords(payload.distanceToInsert as DistanceRecord[]);
-      }
-
-      if (payload.speedToInsert.length > 0) {
-        await insertRecords(payload.speedToInsert as SpeedRecord[]);
-      }
-
-      if (payload.totalCaloriesToInsert.length > 0) {
-        await insertRecords(payload.totalCaloriesToInsert as TotalCaloriesBurnedRecord[]);
-      }
-
-      if (payload.activeCaloriesToInsert.length > 0) {
-        await insertRecords(payload.activeCaloriesToInsert as ActiveCaloriesBurnedRecord[]);
+      for (const batch of subRecordBatches) {
+        if (batch.records && batch.records.length > 0) {
+          await insertRecords(batch.records);
+        }
       }
 
       // 3. Delete original duplicate sessions by record ID
