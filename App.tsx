@@ -57,6 +57,48 @@ function App() {
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
 
   /**
+   * Recalculate overlap conflict groups when tolerance or sessions change
+   */
+  const recalculateConflicts = useCallback(
+    (sessions: DetailedWorkoutSession[], tolMins: number) => {
+      const groups = groupOverlappingSessions(sessions, {
+        toleranceMs: tolMins * 60 * 1000,
+      });
+      setConflictGroups(groups);
+    },
+    []
+  );
+
+  /**
+   * Load workout sessions from Health Connect within selected date range
+   */
+  const loadWorkoutSessions = useCallback(
+    async (targetRangeDays?: string) => {
+      setLoading(true);
+      try {
+        const daysStr = typeof targetRangeDays === 'string' ? targetRangeDays : rangeDays;
+        const days = parseInt(daysStr, 10) || 7;
+        const now = new Date();
+        const startDate = startOfDay(subDays(now, days)).toISOString();
+        const endDate = endOfDay(now).toISOString();
+
+        const sessions = await healthConnectService.fetchSessionsWithSubRecords(
+          startDate,
+          endDate
+        );
+
+        setRawSessions(sessions);
+        recalculateConflicts(sessions, toleranceMinutes);
+      } catch (error: any) {
+        console.error('Failed to load workout sessions:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [rangeDays, toleranceMinutes, recalculateConflicts]
+  );
+
+  /**
    * Check permissions and initialize Health Connect SDK on startup
    */
   const checkInitialPermissions = useCallback(async () => {
@@ -79,7 +121,7 @@ function App() {
       setPermissionError(err.message || 'Failed to communicate with Health Connect');
       setHasPermissions(false);
     }
-  }, []);
+  }, [loadWorkoutSessions]);
 
   useEffect(() => {
     checkInitialPermissions();
@@ -100,44 +142,6 @@ function App() {
     } catch (err: any) {
       setPermissionError(err.message || 'Permission request was denied');
     }
-  };
-
-  /**
-   * Load workout sessions from Health Connect within selected date range
-   */
-  const loadWorkoutSessions = async () => {
-    setLoading(true);
-    try {
-      const days = parseInt(rangeDays, 10) || 7;
-      const now = new Date();
-      const startDate = startOfDay(subDays(now, days)).toISOString();
-      const endDate = endOfDay(now).toISOString();
-
-      const sessions = await healthConnectService.fetchSessionsWithSubRecords(
-        startDate,
-        endDate
-      );
-
-      setRawSessions(sessions);
-      recalculateConflicts(sessions, toleranceMinutes);
-    } catch (error: any) {
-      console.error('Failed to load workout sessions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Recalculate overlap conflict groups when tolerance or sessions change
-   */
-  const recalculateConflicts = (
-    sessions: DetailedWorkoutSession[],
-    tolMins: number
-  ) => {
-    const groups = groupOverlappingSessions(sessions, {
-      toleranceMs: tolMins * 60 * 1000,
-    });
-    setConflictGroups(groups);
   };
 
   // Trigger recalculation on tolerance change
@@ -161,7 +165,7 @@ function App() {
         {hasPermissions && (
           <>
             <Appbar.Action icon="tune" onPress={() => setSettingsVisible(true)} />
-            <Appbar.Action icon="refresh" onPress={loadWorkoutSessions} />
+            <Appbar.Action icon="refresh" onPress={() => loadWorkoutSessions()} />
           </>
         )}
       </Appbar.Header>
@@ -205,7 +209,7 @@ function App() {
               value={rangeDays}
               onValueChange={(val: string) => {
                 setRangeDays(val);
-                loadWorkoutSessions();
+                loadWorkoutSessions(val);
               }}
               buttons={[
                 { value: '3', label: '3 Days' },
