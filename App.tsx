@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, View, StatusBar } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   PaperProvider,
   MD3DarkTheme,
@@ -16,6 +17,8 @@ import {
 } from 'react-native-paper';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 
+import MaterialIcon from '@react-native-vector-icons/material-design-icons';
+
 import { healthConnectService } from './services/HealthConnectService';
 import { groupOverlappingSessions } from './utils/MergeAlgorithm';
 import { WorkoutConflictGroup, DetailedWorkoutSession } from './types';
@@ -23,9 +26,16 @@ import { SessionList } from './components/SessionList';
 
 export default function AppWrapper() {
   return (
-    <PaperProvider theme={MD3LightTheme}>
-      <App />
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider
+        theme={MD3LightTheme}
+        settings={{
+          icon: (props) => <MaterialIcon {...props} />,
+        }}
+      >
+        <App />
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
 
