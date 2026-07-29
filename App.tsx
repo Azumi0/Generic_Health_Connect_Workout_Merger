@@ -152,11 +152,11 @@ function App() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView edges={["left", "right", "bottom"]} style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* App Bar Header */}
-      <Appbar.Header elevated style={{ backgroundColor: theme.colors.surface }}>
+      <Appbar.Header elevated style={{ backgroundColor: theme.colors.surface, paddingTop: 0, height: 56 }}>
         <Appbar.Content title="Workout Deduplicator" titleStyle={styles.appTitle} />
         {hasPermissions && (
           <>
