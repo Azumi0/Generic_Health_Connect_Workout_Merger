@@ -1,0 +1,444 @@
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import {
+  Portal,
+  Dialog,
+  Text,
+  Button,
+  Divider,
+  Chip,
+  Surface,
+  useTheme,
+  IconButton,
+} from 'react-native-paper';
+import { format } from 'date-fns';
+import { WorkoutConflictGroup, MergedWorkoutPayload, DetailedWorkoutSession } from '../types';
+import { formatAppOrigin, formatExerciseType, getSubRecordSummaries } from '../utils/FormatUtils';
+
+interface MergeConfirmationModalProps {
+  visible: boolean;
+  group: WorkoutConflictGroup | null;
+  selectedSessionIds: string[];
+  payload: MergedWorkoutPayload | null;
+  isMerging: boolean;
+  onConfirm: () => void;
+  onDismiss: () => void;
+}
+
+export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
+  visible,
+  group,
+  selectedSessionIds,
+  payload,
+  isMerging,
+  onConfirm,
+  onDismiss,
+}) => {
+  const theme = useTheme();
+
+  const [countdown, setCountdown] = useState<number>(5);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
+
+  // 5-second countdown timer whenever modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      setCountdown(5);
+      setShowDetails(false);
+
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [visible]);
+
+  if (!group || !visible) return null;
+
+  // Filter only the selected workout sessions being merged
+  const selectedSessions: DetailedWorkoutSession[] = group.sessions.filter((s, idx) => {
+    const id = s.session.metadata?.id || `sess_${idx}`;
+    return selectedSessionIds.includes(id);
+  });
+
+  const categoryLabel =
+    payload?.mergedSummary.categoryLabel || group.categoryLabel || 'Merged Workout';
+  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm:ss');
+  const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm:ss');
+
+  const mergedSummary = payload?.mergedSummary;
+
+  return (
+    <Portal>
+      <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
+        <Dialog.Title style={[styles.dialogTitle, { color: theme.colors.error }]}>
+          Confirm Irreversible Merge
+        </Dialog.Title>
+
+        <Dialog.ScrollArea style={styles.scrollArea}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            {/* Irreversible Warning Box */}
+            <Surface style={styles.warningBox} elevation={0}>
+              <View style={styles.warningHeader}>
+                <IconButton icon="alert" iconColor="#DC2626" size={24} style={styles.warningIcon} />
+                <Text variant="titleMedium" style={styles.warningTitle}>
+                  Are you sure you want to proceed?
+                </Text>
+              </View>
+              <Text variant="bodyMedium" style={styles.warningText}>
+                This action is <Text style={styles.boldText}>irreversible</Text>. The{' '}
+                <Text style={styles.boldText}>{selectedSessions.length} original exercise sessions</Text>{' '}
+                selected will be <Text style={styles.boldText}>permanently deleted</Text> from Google Health
+                Connect and replaced by the single merged master workout session.
+              </Text>
+            </Surface>
+
+            {/* High Level Summary Card */}
+            <Surface style={styles.summaryCard} elevation={1}>
+              <Text variant="labelLarge" style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+                Merged Output Summary
+              </Text>
+
+              <View style={styles.summaryRow}>
+                <Chip icon="check-circle" style={styles.categoryChip} compact>
+                  {categoryLabel}
+                </Chip>
+                <Text variant="bodyMedium" style={styles.timeText}>
+                  {startTimeFormatted} - {endTimeFormatted}
+                </Text>
+              </View>
+
+              {mergedSummary && (
+                <View style={styles.previewMetricsRow}>
+                  <View style={styles.previewMetricItem}>
+                    <Text variant="labelSmall" style={styles.metricLabel}>Distance</Text>
+                    <Text variant="titleMedium" style={styles.metricValue}>
+                      {mergedSummary.distanceKm > 0 ? `${mergedSummary.distanceKm} km` : '0.00 km'}
+                    </Text>
+                  </View>
+                  <View style={styles.metricDivider} />
+                  <View style={styles.previewMetricItem}>
+                    <Text variant="labelSmall" style={styles.metricLabel}>Avg HR</Text>
+                    <Text variant="titleMedium" style={styles.metricValue}>
+                      {mergedSummary.avgHeartRateBpm ? `${mergedSummary.avgHeartRateBpm} bpm` : '--'}
+                    </Text>
+                  </View>
+                  <View style={styles.metricDivider} />
+                  <View style={styles.previewMetricItem}>
+                    <Text variant="labelSmall" style={styles.metricLabel}>Calories</Text>
+                    <Text variant="titleMedium" style={styles.metricValue}>
+                      {mergedSummary.caloriesKcal} kcal
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Surface>
+
+            {/* Full Details Toggle Button */}
+            <Button
+              mode="outlined"
+              icon={showDetails ? 'chevron-up' : 'chevron-down'}
+              onPress={() => setShowDetails(!showDetails)}
+              style={styles.detailsToggleButton}
+            >
+              {showDetails
+                ? 'Hide Full Workout Details'
+                : `Show Details (${selectedSessions.length} Workouts & Metadata)`}
+            </Button>
+
+            {/* Expanded Workout List & All Metadata */}
+            {showDetails && (
+              <View style={styles.detailsContainer}>
+                <Divider style={styles.detailsDivider} />
+                <Text variant="titleMedium" style={styles.detailsHeader}>
+                  Workouts To Be Merged & Deleted ({selectedSessions.length})
+                </Text>
+
+                {selectedSessions.map((item, idx) => {
+                  const sess = item.session;
+                  const appName = formatAppOrigin(sess.metadata?.dataOrigin);
+                  const exTypeName = formatExerciseType(sess.exerciseType);
+                  const sessStart = format(new Date(sess.startTime), 'HH:mm:ss');
+                  const sessEnd = format(new Date(sess.endTime), 'HH:mm:ss');
+                  const subSummaries = getSubRecordSummaries(item.subRecords);
+
+                  return (
+                    <Surface key={idx} style={styles.workoutDetailCard} elevation={1}>
+                      <View style={styles.workoutDetailHeader}>
+                        <Text variant="titleSmall" style={styles.workoutTitle}>
+                          #{idx + 1}: {sess.title || `Exercise Session (${exTypeName})`}
+                        </Text>
+                        <Chip compact icon="application" style={styles.appChip}>
+                          {appName}
+                        </Chip>
+                      </View>
+
+                      <View style={styles.metadataGrid}>
+                        <Text variant="bodySmall" style={styles.metaRow}>
+                          <Text style={styles.metaLabel}>Time Window: </Text>
+                          {sessStart} - {sessEnd}
+                        </Text>
+
+                        <Text variant="bodySmall" style={styles.metaRow}>
+                          <Text style={styles.metaLabel}>Exercise Type: </Text>
+                          {exTypeName} (ID: {sess.exerciseType})
+                        </Text>
+
+                        <Text variant="bodySmall" style={styles.metaRow}>
+                          <Text style={styles.metaLabel}>Package Origin: </Text>
+                          {sess.metadata?.dataOrigin || 'Unknown'}
+                        </Text>
+
+                        <Text variant="bodySmall" style={styles.metaRow}>
+                          <Text style={styles.metaLabel}>Session UUID: </Text>
+                          {sess.metadata?.id || 'N/A'}
+                        </Text>
+
+                        {sess.metadata?.clientRecordId ? (
+                          <Text variant="bodySmall" style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Client Record ID: </Text>
+                            {sess.metadata.clientRecordId}
+                          </Text>
+                        ) : null}
+
+                        {sess.metadata?.lastModifiedTime ? (
+                          <Text variant="bodySmall" style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Last Modified: </Text>
+                            {format(new Date(sess.metadata.lastModifiedTime), 'yyyy-MM-dd HH:mm:ss')}
+                          </Text>
+                        ) : null}
+
+                        {sess.notes ? (
+                          <Text variant="bodySmall" style={styles.metaRow}>
+                            <Text style={styles.metaLabel}>Notes: </Text>
+                            {sess.notes}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      <Divider style={styles.subDivider} />
+
+                      <Text variant="labelSmall" style={styles.subHeaderTitle}>
+                        Associated Health Connect Records:
+                      </Text>
+
+                      <View style={styles.subRecordList}>
+                        {subSummaries.map((sub, sIdx) => (
+                          <View key={sIdx} style={styles.subRecordRow}>
+                            <Text
+                              variant="bodySmall"
+                              style={[
+                                styles.subRecordName,
+                                { color: sub.count > 0 ? theme.colors.primary : theme.colors.outline },
+                              ]}
+                            >
+                              • {sub.name}:
+                            </Text>
+                            <Text variant="bodySmall" style={styles.subRecordValue}>
+                              {sub.details}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </Surface>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        </Dialog.ScrollArea>
+
+        <Dialog.Actions style={styles.dialogActions}>
+          <Button mode="outlined" onPress={onDismiss} disabled={isMerging}>
+            Cancel
+          </Button>
+
+          <Button
+            mode="contained"
+            icon="merge"
+            loading={isMerging}
+            disabled={countdown > 0 || isMerging}
+            onPress={onConfirm}
+            buttonColor={countdown > 0 ? theme.colors.surfaceDisabled : theme.colors.error}
+            textColor={countdown > 0 ? theme.colors.onSurfaceDisabled : theme.colors.onError}
+          >
+            {countdown > 0 ? `Confirm (${countdown}s)` : 'Confirm Merge'}
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+};
+
+const styles = StyleSheet.create({
+  dialog: {
+    maxHeight: '90%',
+    borderRadius: 20,
+  },
+  dialogTitle: {
+    fontWeight: '700',
+    fontSize: 20,
+    paddingBottom: 4,
+  },
+  scrollArea: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  warningBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  warningIcon: {
+    margin: 0,
+    marginRight: 4,
+  },
+  warningTitle: {
+    fontWeight: '700',
+    color: '#991B1B',
+  },
+  warningText: {
+    color: '#7F1D1D',
+    lineHeight: 20,
+  },
+  boldText: {
+    fontWeight: '700',
+  },
+  summaryCard: {
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  categoryChip: {
+    backgroundColor: '#E0F2FE',
+  },
+  timeText: {
+    fontWeight: '600',
+    opacity: 0.8,
+  },
+  previewMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  previewMetricItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricLabel: {
+    opacity: 0.6,
+  },
+  metricValue: {
+    fontWeight: '700',
+  },
+  metricDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
+  },
+  detailsToggleButton: {
+    marginVertical: 4,
+  },
+  detailsContainer: {
+    marginTop: 12,
+  },
+  detailsDivider: {
+    marginBottom: 12,
+  },
+  detailsHeader: {
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  workoutDetailCard: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  workoutDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  workoutTitle: {
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 8,
+  },
+  appChip: {
+    height: 28,
+  },
+  metadataGrid: {
+    backgroundColor: '#F1F5F9',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  metaRow: {
+    marginBottom: 4,
+  },
+  metaLabel: {
+    fontWeight: '700',
+    opacity: 0.7,
+  },
+  subDivider: {
+    marginVertical: 8,
+  },
+  subHeaderTitle: {
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  subRecordList: {
+    paddingLeft: 4,
+  },
+  subRecordRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  subRecordName: {
+    fontWeight: '600',
+  },
+  subRecordValue: {
+    opacity: 0.8,
+  },
+  dialogActions: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+});

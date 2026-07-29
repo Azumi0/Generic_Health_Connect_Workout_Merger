@@ -143,6 +143,16 @@ function runTests() {
 
   console.assert(payload.originalSessionIdsToDelete.length === 2, 'Should mark 2 original sessions for deletion');
 
+  // Test FormatUtils Helpers for Modal Metadata
+  const { formatExerciseType, getSubRecordSummaries } = require('../FormatUtils');
+  console.assert(formatExerciseType(57) === 'Treadmill Running', 'Exercise type 57 should format to Treadmill Running');
+  console.assert(formatExerciseType(8) === 'Biking / Cycling', 'Exercise type 8 should format to Biking / Cycling');
+
+  const subSummaries = getSubRecordSummaries(sessionB.subRecords);
+  console.assert(subSummaries.length > 0, 'Sub-records summaries should not be empty');
+  const hrSummary = subSummaries.find((s: any) => s.name === 'Heart Rate Records');
+  console.assert(hrSummary && hrSummary.count === 1, 'Should summarize 1 Heart Rate record');
+
   console.log('✅ ALL TESTS PASSED SUCCESSFULLY!');
 }
 

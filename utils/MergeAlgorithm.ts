@@ -421,6 +421,20 @@ export function generateMergedWorkoutPayload(
   const rawHrv: HeartRateVariabilityRmssdRecord[] = [];
   const rawRestingHeartRate: RestingHeartRateRecord[] = [];
 
+  if (
+    category === ActivityCategory.INDOOR_MACHINE &&
+    masterDistanceSession?.subRecords.elevationGainedRecords &&
+    masterDistanceSession.subRecords.elevationGainedRecords.length > 0
+  ) {
+    // Treadmill Equipment Telemetry takes priority for incline elevation gain
+    // (smartwatch barometers cannot measure inclination when room altitude is static).
+    rawElevationGained.push(...masterDistanceSession.subRecords.elevationGainedRecords);
+  } else {
+    for (const item of sessionsToMerge) {
+      if (item.subRecords.elevationGainedRecords) rawElevationGained.push(...item.subRecords.elevationGainedRecords);
+    }
+  }
+
   for (const item of sessionsToMerge) {
     if (item.subRecords.powerRecords) rawPower.push(...item.subRecords.powerRecords);
     if (item.subRecords.cyclingPedalingCadenceRecords)
@@ -428,7 +442,6 @@ export function generateMergedWorkoutPayload(
     if (item.subRecords.stepsRecords && category !== ActivityCategory.STATIONARY_NON_DISTANCE)
       rawSteps.push(...item.subRecords.stepsRecords);
     if (item.subRecords.stepsCadenceRecords) rawStepsCadence.push(...item.subRecords.stepsCadenceRecords);
-    if (item.subRecords.elevationGainedRecords) rawElevationGained.push(...item.subRecords.elevationGainedRecords);
     if (item.subRecords.floorsClimbedRecords) rawFloorsClimbed.push(...item.subRecords.floorsClimbedRecords);
     if (item.subRecords.wheelchairPushesRecords) rawWheelchairPushes.push(...item.subRecords.wheelchairPushesRecords);
     if (item.subRecords.vo2MaxRecords) rawVo2Max.push(...item.subRecords.vo2MaxRecords);

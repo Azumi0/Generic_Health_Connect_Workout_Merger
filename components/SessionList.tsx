@@ -29,6 +29,7 @@ import {
   calculateTotalDistance,
   calculateTotalCalories,
 } from '../utils/FormatUtils';
+import { MergeConfirmationModal } from './MergeConfirmationModal';
 
 interface SessionListProps {
   groups: WorkoutConflictGroup[];
@@ -296,21 +297,56 @@ export const SessionList: React.FC<SessionListProps> = ({
   const [mergingGroupId, setMergingGroupId] = useState<string | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
 
+  // Confirmation Modal State
+  const [pendingGroup, setPendingGroup] = useState<WorkoutConflictGroup | null>(null);
+  const [pendingSelectedSessionIds, setPendingSelectedSessionIds] = useState<string[]>([]);
+  const [pendingPayload, setPendingPayload] = useState<MergedWorkoutPayload | null>(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+
   const conflicts = groups.filter((g: WorkoutConflictGroup) => g.status === 'conflict_detected');
   const cleanSessions = groups.filter((g: WorkoutConflictGroup) => g.status !== 'conflict_detected');
 
-  const handleMergeGroup = async (group: WorkoutConflictGroup, selectedSessionIds: string[]) => {
+  // Triggered when user clicks "Merge X Workouts" button -> Opens Confirmation Modal
+  const handleInitiateMergeGroup = (group: WorkoutConflictGroup, selectedSessionIds: string[]) => {
     try {
-      setMergingGroupId(group.id);
       const payload = generateMergedWorkoutPayload(group, selectedSessionIds);
-      await healthConnectService.executeMerge(payload);
-      setSnackbarMessage(`Successfully merged ${selectedSessionIds.length} workouts into ${payload.mergedSummary.categoryLabel}!`);
-      onMergeSuccess(group.id);
+      setPendingGroup(group);
+      setPendingSelectedSessionIds(selectedSessionIds);
+      setPendingPayload(payload);
+      setModalVisible(true);
+    } catch (error: any) {
+      setSnackbarMessage(`Failed to generate merge preview: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  // Triggered when user clicks "Confirm Merge" inside the Confirmation Modal (after 5s countdown)
+  const handleConfirmMerge = async () => {
+    if (!pendingGroup || !pendingPayload) return;
+
+    try {
+      setMergingGroupId(pendingGroup.id);
+      await healthConnectService.executeMerge(pendingPayload);
+      setSnackbarMessage(
+        `Successfully merged ${pendingSelectedSessionIds.length} workouts into ${pendingPayload.mergedSummary.categoryLabel}!`
+      );
+      setModalVisible(false);
+      onMergeSuccess(pendingGroup.id);
     } catch (error: any) {
       setSnackbarMessage(`Merge failed: ${error.message || 'Unknown error'}`);
     } finally {
       setMergingGroupId(null);
+      setPendingGroup(null);
+      setPendingSelectedSessionIds([]);
+      setPendingPayload(null);
     }
+  };
+
+  const handleDismissModal = () => {
+    if (mergingGroupId) return; // Prevent dismiss while merge is actively persisting
+    setModalVisible(false);
+    setPendingGroup(null);
+    setPendingSelectedSessionIds([]);
+    setPendingPayload(null);
   };
 
   if (loading) {
@@ -370,11 +406,22 @@ export const SessionList: React.FC<SessionListProps> = ({
               key={group.id}
               group={group}
               isMerging={mergingGroupId === group.id}
-              onMergeGroup={handleMergeGroup}
+              onMergeGroup={handleInitiateMergeGroup}
             />
           ))}
         </ScrollView>
       )}
+
+      {/* Confirmation Modal prior to merging */}
+      <MergeConfirmationModal
+        visible={modalVisible}
+        group={pendingGroup}
+        selectedSessionIds={pendingSelectedSessionIds}
+        payload={pendingPayload}
+        isMerging={Boolean(mergingGroupId)}
+        onConfirm={handleConfirmMerge}
+        onDismiss={handleDismissModal}
+      />
 
       <Snackbar
         visible={Boolean(snackbarMessage)}
