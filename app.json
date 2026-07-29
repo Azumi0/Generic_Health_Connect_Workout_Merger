@@ -99,6 +99,7 @@
       ]
     },
     "plugins": [
+      "./plugins/withHealthConnectCustomization",
       [
         "react-native-health-connect",
         {
