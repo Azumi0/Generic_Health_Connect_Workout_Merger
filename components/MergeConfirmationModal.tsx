@@ -19,6 +19,7 @@ import {
   getSubRecordSummaries,
   convertPayloadToSubRecords,
 } from '../utils/FormatUtils';
+import { useLanguage } from '../i18n';
 
 interface MergeConfirmationModalProps {
   visible: boolean;
@@ -40,6 +41,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
   onDismiss,
 }) => {
   const theme = useTheme();
+  const { t, dateFnsLocale } = useLanguage();
 
   const [countdown, setCountdown] = useState<number>(5);
   const [showDetails, setShowDetails] = useState<boolean>(false);
@@ -73,20 +75,24 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
   });
 
   const categoryLabel =
-    payload?.mergedSummary.categoryLabel || group.categoryLabel || 'Merged Workout';
-  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm:ss');
-  const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm:ss');
+    payload?.mergedSummary.categoryLabel || group.categoryLabel || t('categories.mergedWorkout');
+  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm:ss', {
+    locale: dateFnsLocale,
+  });
+  const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm:ss', {
+    locale: dateFnsLocale,
+  });
 
   const mergedSummary = payload?.mergedSummary;
   const mergedSubSummaries = payload
-    ? getSubRecordSummaries(convertPayloadToSubRecords(payload))
+    ? getSubRecordSummaries(convertPayloadToSubRecords(payload), t)
     : [];
 
   return (
     <Portal>
       <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
         <Dialog.Title style={[styles.dialogTitle, { color: theme.colors.error }]}>
-          Confirm Irreversible Merge
+          {t('confirmationModal.title')}
         </Dialog.Title>
 
         <Dialog.ScrollArea style={styles.scrollArea}>
@@ -96,21 +102,18 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
               <View style={styles.warningHeader}>
                 <IconButton icon="alert" iconColor="#DC2626" size={24} style={styles.warningIcon} />
                 <Text variant="titleMedium" style={styles.warningTitle}>
-                  Are you sure you want to proceed?
+                  {t('confirmationModal.warningTitle')}
                 </Text>
               </View>
               <Text variant="bodyMedium" style={styles.warningText}>
-                This action is <Text style={styles.boldText}>irreversible</Text>. The{' '}
-                <Text style={styles.boldText}>{selectedSessions.length} original exercise sessions</Text>{' '}
-                selected will be <Text style={styles.boldText}>permanently deleted</Text> from Google Health
-                Connect and replaced by the single merged master workout session.
+                {t('confirmationModal.warningText', { count: selectedSessions.length })}
               </Text>
             </Surface>
 
             {/* High Level Summary Card */}
             <Surface style={styles.summaryCard} elevation={1}>
               <Text variant="labelLarge" style={[styles.sectionTitle, { color: theme.colors.primary }]}>
-                Merged Output Summary
+                {t('confirmationModal.summaryTitle')}
               </Text>
 
               <View style={styles.summaryRow}>
@@ -125,21 +128,21 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
               {mergedSummary && (
                 <View style={styles.previewMetricsRow}>
                   <View style={styles.previewMetricItem}>
-                    <Text variant="labelSmall" style={styles.metricLabel}>Distance</Text>
+                    <Text variant="labelSmall" style={styles.metricLabel}>{t('metrics.distance')}</Text>
                     <Text variant="titleMedium" style={styles.metricValue}>
                       {mergedSummary.distanceKm > 0 ? `${mergedSummary.distanceKm} km` : '0.00 km'}
                     </Text>
                   </View>
                   <View style={styles.metricDivider} />
                   <View style={styles.previewMetricItem}>
-                    <Text variant="labelSmall" style={styles.metricLabel}>Avg HR</Text>
+                    <Text variant="labelSmall" style={styles.metricLabel}>{t('metrics.avgHrShort')}</Text>
                     <Text variant="titleMedium" style={styles.metricValue}>
                       {mergedSummary.avgHeartRateBpm ? `${mergedSummary.avgHeartRateBpm} bpm` : '--'}
                     </Text>
                   </View>
                   <View style={styles.metricDivider} />
                   <View style={styles.previewMetricItem}>
-                    <Text variant="labelSmall" style={styles.metricLabel}>Calories</Text>
+                    <Text variant="labelSmall" style={styles.metricLabel}>{t('metrics.calories')}</Text>
                     <Text variant="titleMedium" style={styles.metricValue}>
                       {mergedSummary.caloriesKcal} kcal
                     </Text>
@@ -156,8 +159,8 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
               style={styles.detailsToggleButton}
             >
               {showDetails
-                ? 'Hide Full Workout Details'
-                : `Show Details (${selectedSessions.length} Workouts & Merged Output)`}
+                ? t('confirmationModal.hideDetails')
+                : t('confirmationModal.showDetails', { count: selectedSessions.length })}
             </Button>
 
             {/* Expanded Workout List & All Metadata */}
@@ -170,38 +173,38 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                   <Surface style={styles.mergedOutputDetailCard} elevation={2}>
                     <View style={styles.workoutDetailHeader}>
                       <Text variant="titleMedium" style={[styles.workoutTitle, { color: '#0369A1' }]}>
-                        Master Merged Workout (To Be Inserted)
+                        {t('confirmationModal.masterTitle')}
                       </Text>
                       <Chip compact icon="check-decagram" style={styles.outputChip}>
-                        Final Output
+                        {t('confirmationModal.finalOutputChip')}
                       </Chip>
                     </View>
 
                     <View style={styles.metadataGrid}>
                       <Text variant="bodySmall" style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Session Title: </Text>
-                        {payload.sessionToInsert.title || 'Merged Workout'}
+                        <Text style={styles.metaLabel}>{t('confirmationModal.sessionTitleLabel')} </Text>
+                        {payload.sessionToInsert.title || t('confirmationModal.mergedWorkoutDefaultTitle')}
                       </Text>
 
                       <Text variant="bodySmall" style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Exercise Type: </Text>
-                        {formatExerciseType(payload.sessionToInsert.exerciseType)} (ID: {payload.sessionToInsert.exerciseType})
+                        <Text style={styles.metaLabel}>{t('confirmationModal.exerciseTypeLabel')} </Text>
+                        {formatExerciseType(payload.sessionToInsert.exerciseType, t)} (ID: {payload.sessionToInsert.exerciseType})
                       </Text>
 
                       <Text variant="bodySmall" style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Target Time Window: </Text>
+                        <Text style={styles.metaLabel}>{t('confirmationModal.targetTimeLabel')} </Text>
                         {format(new Date(payload.sessionToInsert.startTime), 'HH:mm:ss')} -{' '}
                         {format(new Date(payload.sessionToInsert.endTime), 'HH:mm:ss')}
                       </Text>
 
                       <Text variant="bodySmall" style={styles.metaRow}>
-                        <Text style={styles.metaLabel}>Category Resolution: </Text>
+                        <Text style={styles.metaLabel}>{t('confirmationModal.categoryLabel')} </Text>
                         {categoryLabel}
                       </Text>
 
                       {mergedSummary?.contributingSources && mergedSummary.contributingSources.length > 0 ? (
                         <View style={{ marginTop: 4 }}>
-                          <Text style={styles.metaLabel}>Metric Source Attribution: </Text>
+                          <Text style={styles.metaLabel}>{t('confirmationModal.metricSourceLabel')} </Text>
                           {mergedSummary.contributingSources.map((cs, cIdx) => (
                             <Text key={cIdx} variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.primary }}>
                               • {cs.metric}: {cs.source}
@@ -214,7 +217,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                     <Divider style={styles.subDivider} />
 
                     <Text variant="labelSmall" style={styles.subHeaderTitle}>
-                      Health Connect Records To Be Inserted ({mergedSubSummaries.filter((s) => s.count > 0).length} metric types):
+                      {t('confirmationModal.recordsToInsertHeader', { count: mergedSubSummaries.filter((s) => s.count > 0).length })}
                     </Text>
 
                     <View style={styles.subRecordList}>
@@ -240,16 +243,16 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
 
                 {/* SECTION 2: ORIGINAL INPUT WORKOUTS */}
                 <Text variant="titleMedium" style={styles.detailsHeader}>
-                  Original Workouts To Be Deleted ({selectedSessions.length})
+                  {t('confirmationModal.originalWorkoutsHeader', { count: selectedSessions.length })}
                 </Text>
 
                 {selectedSessions.map((item, idx) => {
                   const sess = item.session;
-                  const appName = formatAppOrigin(sess.metadata?.dataOrigin);
-                  const exTypeName = formatExerciseType(sess.exerciseType);
+                  const appName = formatAppOrigin(sess.metadata?.dataOrigin, t);
+                  const exTypeName = formatExerciseType(sess.exerciseType, t);
                   const sessStart = format(new Date(sess.startTime), 'HH:mm:ss');
                   const sessEnd = format(new Date(sess.endTime), 'HH:mm:ss');
-                  const subSummaries = getSubRecordSummaries(item.subRecords);
+                  const subSummaries = getSubRecordSummaries(item.subRecords, t);
 
                   return (
                     <Surface key={idx} style={styles.workoutDetailCard} elevation={1}>
@@ -269,7 +272,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                         </Text>
 
                         <Text variant="bodySmall" style={styles.metaRow}>
-                          <Text style={styles.metaLabel}>Exercise Type: </Text>
+                          <Text style={styles.metaLabel}>{t('confirmationModal.exerciseTypeLabel')} </Text>
                           {exTypeName} (ID: {sess.exerciseType})
                         </Text>
 
@@ -308,7 +311,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                       <Divider style={styles.subDivider} />
 
                       <Text variant="labelSmall" style={styles.subHeaderTitle}>
-                        Associated Health Connect Records:
+                        {t('confirmationModal.recordedTelemetryHeader')}
                       </Text>
 
                       <View style={styles.subRecordList}>
@@ -339,7 +342,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
 
         <Dialog.Actions style={styles.dialogActions}>
           <Button mode="outlined" onPress={onDismiss} disabled={isMerging}>
-            Cancel
+            {t('confirmationModal.cancel')}
           </Button>
 
           <Button
@@ -351,7 +354,9 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
             buttonColor={countdown > 0 ? theme.colors.surfaceDisabled : theme.colors.error}
             textColor={countdown > 0 ? theme.colors.onSurfaceDisabled : theme.colors.onError}
           >
-            {countdown > 0 ? `Confirm (${countdown}s)` : 'Confirm Merge'}
+            {countdown > 0
+              ? t('confirmationModal.confirmTimer', { countdown })
+              : t('confirmationModal.confirmReady')}
           </Button>
         </Dialog.Actions>
       </Dialog>

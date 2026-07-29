@@ -32,6 +32,7 @@ import {
   formatExerciseType,
 } from '../utils/FormatUtils';
 import { MergeConfirmationModal } from './MergeConfirmationModal';
+import { useLanguage } from '../i18n';
 
 interface SessionListProps {
   groups: WorkoutConflictGroup[];
@@ -51,23 +52,35 @@ interface ConflictCardProps {
  */
 const CategoryBadge: React.FC<{ category?: ActivityCategory; label?: string }> = ({ category, label }) => {
   const theme = useTheme();
+  const { t } = useLanguage();
 
   let icon = 'tag';
   let backgroundColor = theme.colors.surfaceVariant;
   let textColor = theme.colors.onSurfaceVariant;
 
+  let displayLabel = label;
   if (category === ActivityCategory.INDOOR_MACHINE) {
     icon = 'run-fast';
     backgroundColor = '#E0F2FE';
     textColor = '#0369A1';
+    if (label === 'Indoor Treadmill') displayLabel = t('categories.indoorTreadmill');
+    else if (!label || label === 'Indoor Equipment') displayLabel = t('categories.indoorEquipment');
   } else if (category === ActivityCategory.OUTDOOR_SPATIAL) {
     icon = 'compass';
     backgroundColor = '#DCFCE7';
     textColor = '#15803D';
+    if (label === 'Outdoor GPS Track') displayLabel = t('categories.outdoorGps');
+    else if (!label || label === 'Outdoor Spatial') displayLabel = t('categories.outdoorSpatial');
   } else if (category === ActivityCategory.STATIONARY_NON_DISTANCE) {
     icon = 'dumbbell';
     backgroundColor = '#FFE4E6';
     textColor = '#BE123C';
+    if (label === 'Stationary / Strength') displayLabel = t('categories.stationaryStrength');
+    else if (!label || label === 'Stationary Activity') displayLabel = t('categories.stationaryActivity');
+  }
+
+  if (!displayLabel || displayLabel === 'Conflict') {
+    displayLabel = t('categories.conflict');
   }
 
   return (
@@ -77,7 +90,7 @@ const CategoryBadge: React.FC<{ category?: ActivityCategory; label?: string }> =
       textStyle={[styles.categoryBadgeText, { color: textColor }]}
       compact
     >
-      {label || 'Workout Category'}
+      {displayLabel}
     </Chip>
   );
 };
@@ -90,31 +103,32 @@ const ContributingSourcesView: React.FC<{
   mergedPreview?: MergedWorkoutSession;
 }> = ({ sources, mergedPreview }) => {
   const theme = useTheme();
+  const { t } = useLanguage();
 
   return (
     <Surface style={styles.sourcesContainer} elevation={0}>
       <Text variant="labelMedium" style={[styles.sourcesHeaderTitle, { color: theme.colors.primary }]}>
-        Merged Resolution & Telemetry Attribution
+        {t('sessionList.telemetryAttribution')}
       </Text>
 
       {mergedPreview && (
         <View style={styles.previewMetricsRow}>
           <View style={styles.previewMetricItem}>
-            <Text variant="bodySmall" style={styles.previewMetricLabel}>Distance</Text>
+            <Text variant="bodySmall" style={styles.previewMetricLabel}>{t('metrics.distance')}</Text>
             <Text variant="titleMedium" style={styles.previewMetricValue}>
               {mergedPreview.distanceKm > 0 ? `${mergedPreview.distanceKm} km` : '0.00 km'}
             </Text>
           </View>
           <View style={styles.previewMetricDivider} />
           <View style={styles.previewMetricItem}>
-            <Text variant="bodySmall" style={styles.previewMetricLabel}>Avg Heart Rate</Text>
+            <Text variant="bodySmall" style={styles.previewMetricLabel}>{t('metrics.avgHeartRate')}</Text>
             <Text variant="titleMedium" style={styles.previewMetricValue}>
               {mergedPreview.avgHeartRateBpm ? `${mergedPreview.avgHeartRateBpm} bpm` : '--'}
             </Text>
           </View>
           <View style={styles.previewMetricDivider} />
           <View style={styles.previewMetricItem}>
-            <Text variant="bodySmall" style={styles.previewMetricLabel}>Calories</Text>
+            <Text variant="bodySmall" style={styles.previewMetricLabel}>{t('metrics.calories')}</Text>
             <Text variant="titleMedium" style={styles.previewMetricValue}>
               {mergedPreview.caloriesKcal} kcal
             </Text>
@@ -125,7 +139,7 @@ const ContributingSourcesView: React.FC<{
       <Divider style={styles.sourceDivider} />
 
       <Text variant="labelSmall" style={styles.sourcesSubLabel}>
-        Metric Hierarchy Resolution:
+        {t('sessionList.metricHierarchy')}
       </Text>
       <View style={styles.sourcesChipList}>
         {sources.map((cs, idx) => (
@@ -145,6 +159,7 @@ const ContributingSourcesView: React.FC<{
 
 const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGroup }) => {
   const theme = useTheme();
+  const { t, dateFnsLocale } = useLanguage();
 
   const getSessionId = (item: WorkoutConflictGroup['sessions'][0], index: number) =>
     item.session.metadata?.id || `sess_${index}`;
@@ -174,8 +189,8 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
     currentPayload = null;
   }
 
-  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm');
-  const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm');
+  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm', { locale: dateFnsLocale });
+  const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm', { locale: dateFnsLocale });
   const selectedCount = selectedSessionIds.length;
 
   const category = currentPayload?.mergedSummary.detectedCategory || group.detectedCategory;
@@ -188,7 +203,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
       <Card.Title
         title={`${startTimeFormatted} - ${endTimeFormatted}`}
         titleStyle={styles.cardTitle}
-        subtitle={`Overlap of ${group.sessions.length} workouts (${selectedCount} selected)`}
+        subtitle={t('sessionList.overlapCount', { total: group.sessions.length, selected: selectedCount })}
         right={() => (
           <View style={styles.headerBadgeContainer}>
             <CategoryBadge category={category} label={categoryLabel} />
@@ -198,7 +213,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
       <Card.Content>
         {group.hasMultipleExerciseTypes && (
           <Chip compact icon="alert-decagram" style={styles.typeWarningChip}>
-            Mixed Exercise Types Detected
+            {t('sessionList.mixedTypesWarning')}
           </Chip>
         )}
 
@@ -210,7 +225,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
         <Divider style={styles.divider} />
 
         <Text variant="labelMedium" style={styles.sessionsSubHeader}>
-          Select Sessions to Deduplicate:
+          {t('sessionList.selectSessionsHeader')}
         </Text>
 
         {group.sessions.map((item, index) => {
@@ -218,7 +233,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
           const isSelected = selectedSessionIds.includes(sessId);
           const sessStart = format(new Date(item.session.startTime), 'HH:mm:ss');
           const sessEnd = format(new Date(item.session.endTime), 'HH:mm:ss');
-          const appName = formatAppOrigin(item.session.metadata?.dataOrigin);
+          const appName = formatAppOrigin(item.session.metadata?.dataOrigin, t);
 
           const hrVal = calculateAvgHeartRate(item.subRecords.heartRateRecords);
           const distVal = calculateTotalDistance(item.subRecords.distanceRecords);
@@ -237,7 +252,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
                 <View style={styles.sessionMainInfo}>
                   <View style={styles.sessionHeader}>
                     <Text variant="titleMedium" style={styles.sessionTitle}>
-                      {item.session.title || `Workout #${index + 1}`}
+                      {item.session.title || t('sessionList.workoutDefaultTitle', { num: index + 1 })}
                     </Text>
                     <Text variant="bodySmall" style={{ color: theme.colors.outline }}>
                       {sessStart} - {sessEnd}
@@ -245,7 +260,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
                   </View>
 
                   <Text variant="bodySmall" style={[styles.appSourceText, { color: theme.colors.primary }]}>
-                    Source: {appName}
+                    {t('sessionList.sourceLabel', { source: appName })}
                   </Text>
 
                   {item.session.notes ? (
@@ -277,12 +292,12 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
           mode="contained"
           icon="merge"
           loading={isMerging}
-          disabled={isMerging || selectedCount < 2}
+          disabled={isMerging || selectedCount < 1}
           onPress={() => onMergeGroup(group, selectedSessionIds)}
         >
-          {selectedCount < 2
-            ? 'Select at least 2 to merge'
-            : `Merge ${selectedCount} Workouts`}
+          {selectedCount < 1
+            ? t('sessionList.selectAtLeastOne')
+            : t('sessionList.mergeSelected', { count: selectedCount })}
         </Button>
       </Card.Actions>
     </Card>
@@ -295,16 +310,17 @@ interface StandaloneCardProps {
 
 const StandaloneCard: React.FC<StandaloneCardProps> = ({ group }) => {
   const theme = useTheme();
+  const { t, dateFnsLocale } = useLanguage();
   const sessionItem = group.sessions[0];
   if (!sessionItem) return null;
 
   const session = sessionItem.session;
   const subRecords = sessionItem.subRecords;
 
-  const startTimeFormatted = format(new Date(session.startTime), 'MMM d, HH:mm');
-  const endTimeFormatted = format(new Date(session.endTime), 'HH:mm');
-  const appName = formatAppOrigin(session.metadata?.dataOrigin);
-  const exerciseTypeName = formatExerciseType(session.exerciseType);
+  const startTimeFormatted = format(new Date(session.startTime), 'MMM d, HH:mm', { locale: dateFnsLocale });
+  const endTimeFormatted = format(new Date(session.endTime), 'HH:mm', { locale: dateFnsLocale });
+  const appName = formatAppOrigin(session.metadata?.dataOrigin, t);
+  const exerciseTypeName = formatExerciseType(session.exerciseType, t);
 
   const hrVal = calculateAvgHeartRate(subRecords.heartRateRecords);
   const distVal = calculateTotalDistance(subRecords.distanceRecords);
@@ -327,7 +343,7 @@ const StandaloneCard: React.FC<StandaloneCardProps> = ({ group }) => {
       />
       <Card.Content>
         <Text variant="bodySmall" style={[styles.appSourceText, { color: theme.colors.primary }]}>
-          Source: {appName} • {exerciseTypeName}
+          {t('sessionList.sourceLabel', { source: appName })} • {exerciseTypeName}
         </Text>
 
         {session.notes ? (
@@ -359,6 +375,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   onMergeSuccess,
 }) => {
   const theme = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'overlapping' | 'standalone'>('overlapping');
   const [mergingGroupId, setMergingGroupId] = useState<string | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
@@ -390,7 +407,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       setPendingPayload(payload);
       setModalVisible(true);
     } catch (error: any) {
-      setSnackbarMessage(`Failed to generate merge preview: ${error.message || 'Unknown error'}`);
+      setSnackbarMessage(t('snackbars.mergeError', { error: error.message || 'Unknown error' }));
     }
   };
 
@@ -402,12 +419,12 @@ export const SessionList: React.FC<SessionListProps> = ({
       setMergingGroupId(pendingGroup.id);
       await healthConnectService.executeMerge(pendingPayload);
       setSnackbarMessage(
-        `Successfully merged ${pendingSelectedSessionIds.length} workouts into ${pendingPayload.mergedSummary.categoryLabel}!`
+        t('snackbars.mergeSuccess', { count: pendingSelectedSessionIds.length })
       );
       setModalVisible(false);
       onMergeSuccess(pendingGroup.id);
     } catch (error: any) {
-      setSnackbarMessage(`Merge failed: ${error.message || 'Unknown error'}`);
+      setSnackbarMessage(t('snackbars.mergeError', { error: error.message || 'Unknown error' }));
     } finally {
       setMergingGroupId(null);
       setPendingGroup(null);
@@ -428,7 +445,7 @@ export const SessionList: React.FC<SessionListProps> = ({
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Scanning Health Connect for overlapping workouts...</Text>
+        <Text style={styles.loadingText}>{t('sessionList.merging')}</Text>
       </View>
     );
   }
@@ -439,7 +456,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         <View style={styles.statsRow}>
           <View>
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              Detected Conflicts
+              {t('sessionList.conflictGroupsHeader')} 
             </Text>
             <Text
               variant="headlineMedium"
@@ -451,7 +468,7 @@ export const SessionList: React.FC<SessionListProps> = ({
 
           <View>
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              Standalone Workouts
+              {t('sessionList.regularGroupsHeader')} 
             </Text>
             <Text variant="headlineMedium">{cleanSessions.length}</Text>
           </View>
@@ -468,12 +485,12 @@ export const SessionList: React.FC<SessionListProps> = ({
           buttons={[
             {
               value: 'overlapping',
-              label: `Overlapping Workouts (${conflicts.length})`,
+              label: t('sessionList.buttonOverlappingTab', { count: conflicts.length }),
               icon: 'layers-triple-outline',
             },
             {
               value: 'standalone',
-              label: `Standalone Workouts (${cleanSessions.length})`,
+              label: t('sessionList.buttonStandaloneTab', { count: cleanSessions.length }),
               icon: 'check-circle-outline',
             },
           ]}
@@ -486,12 +503,12 @@ export const SessionList: React.FC<SessionListProps> = ({
         conflicts.length === 0 ? (
           <ScrollView contentContainerStyle={styles.emptyContainer}>
             <IconButton icon="check-decagram" size={64} iconColor={theme.colors.primary} />
-            <Text variant="titleLarge">No Overlapping Conflicts Found</Text>
+            <Text variant="titleLarge">{t('sessionList.emptyTitle')}</Text>
             <Text variant="bodyMedium" style={styles.emptySubtitle}>
-              All workout sessions in the selected range are distinct without time conflicts.
+              {t('sessionList.emptySubtitle', { days: '7' })}
             </Text>
             <Button mode="outlined" style={{ marginTop: 16 }} onPress={onRefresh}>
-              Re-scan Workouts
+              {t('sessionList.rescanButton')}
             </Button>
           </ScrollView>
         ) : (
@@ -508,13 +525,13 @@ export const SessionList: React.FC<SessionListProps> = ({
         )
       ) : cleanSessions.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContainer}>
-          <IconButton icon="dumbbell" size={64} iconColor={theme.colors.primary} />
-          <Text variant="titleLarge">No Standalone Workouts Found</Text>
+          <IconButton icon="package-variant" size={64} iconColor={theme.colors.outline} />
+          <Text variant="titleLarge">{t('sessionList.emptyTitle')}</Text>
           <Text variant="bodyMedium" style={styles.emptySubtitle}>
-            There are no single workout sessions in the selected scan window.
+            No workout sessions were found in Health Connect.
           </Text>
           <Button mode="outlined" style={{ marginTop: 16 }} onPress={onRefresh}>
-            Re-scan Workouts
+            {t('sessionList.rescanButton')}
           </Button>
         </ScrollView>
       ) : (
@@ -531,15 +548,15 @@ export const SessionList: React.FC<SessionListProps> = ({
         group={pendingGroup}
         selectedSessionIds={pendingSelectedSessionIds}
         payload={pendingPayload}
-        isMerging={Boolean(mergingGroupId)}
+        isMerging={mergingGroupId !== null}
         onConfirm={handleConfirmMerge}
         onDismiss={handleDismissModal}
       />
 
       <Snackbar
-        visible={Boolean(snackbarMessage)}
+        visible={snackbarMessage !== null}
         onDismiss={() => setSnackbarMessage(null)}
-        duration={3000}
+        duration={4000}
         action={{
           label: 'OK',
           onPress: () => setSnackbarMessage(null),

@@ -32,9 +32,12 @@ const KNOWN_APP_ORIGINS: Record<string, string> = {
 /**
  * Converts a raw Health Connect dataOrigin package name into a human-readable app name.
  */
-export function formatAppOrigin(dataOrigin?: string): string {
+export function formatAppOrigin(
+  dataOrigin?: string,
+  t?: (key: string) => string
+): string {
   if (!dataOrigin || !dataOrigin.trim()) {
-    return 'Unknown App';
+    return t ? t('metrics.unknownApp') : 'Unknown App';
   }
 
   const trimmed = dataOrigin.trim();
@@ -151,9 +154,59 @@ export function calculateTotalCalories(
 
 /**
  * Converts a numeric Health Connect exerciseType integer to a human-readable name.
+ * Optionally accepts a translation function `t`.
  */
-export function formatExerciseType(type?: number): string {
-  if (type === undefined || type === null) return 'Unknown Exercise';
+export function formatExerciseType(
+  type?: number,
+  t?: (key: string, params?: Record<string, string | number>) => string
+): string {
+  if (type === undefined || type === null) {
+    return t ? t('exerciseTypes.unknown') : 'Unknown Exercise';
+  }
+
+  const keyMap: Record<number, string> = {
+    2: 'exerciseTypes.badminton',
+    5: 'exerciseTypes.basketball',
+    8: 'exerciseTypes.cycling',
+    9: 'exerciseTypes.indoorCycling',
+    11: 'exerciseTypes.boxing',
+    13: 'exerciseTypes.calisthenics',
+    16: 'exerciseTypes.dancing',
+    25: 'exerciseTypes.elliptical',
+    33: 'exerciseTypes.golf',
+    36: 'exerciseTypes.hiit',
+    37: 'exerciseTypes.hiking',
+    42: 'exerciseTypes.martialArts',
+    44: 'exerciseTypes.padel',
+    46: 'exerciseTypes.pickleball',
+    47: 'exerciseTypes.pilates',
+    51: 'exerciseTypes.rockClimbing',
+    53: 'exerciseTypes.rowing',
+    54: 'exerciseTypes.rowingMachine',
+    56: 'exerciseTypes.running',
+    57: 'exerciseTypes.treadmillRunning',
+    61: 'exerciseTypes.skiing',
+    62: 'exerciseTypes.snowboarding',
+    64: 'exerciseTypes.soccer',
+    67: 'exerciseTypes.stairClimbing',
+    68: 'exerciseTypes.stairClimbingMachine',
+    69: 'exerciseTypes.stationaryBiking',
+    70: 'exerciseTypes.stretch',
+    72: 'exerciseTypes.swimmingOpenWater',
+    73: 'exerciseTypes.swimmingPool',
+    74: 'exerciseTypes.tableTennis',
+    76: 'exerciseTypes.tennis',
+    78: 'exerciseTypes.volleyball',
+    79: 'exerciseTypes.walking',
+    80: 'exerciseTypes.treadmillWalking',
+    82: 'exerciseTypes.weightlifting',
+    83: 'exerciseTypes.yoga',
+  };
+
+  if (t && keyMap[type]) {
+    return t(keyMap[type]);
+  }
+
   const typeMap: Record<number, string> = {
     0: 'Unknown',
     2: 'Badminton',
@@ -216,6 +269,11 @@ export function formatExerciseType(type?: number): string {
     82: 'Weightlifting',
     83: 'Yoga',
   };
+
+  if (t) {
+    return t('exerciseTypes.typeNumber', { type });
+  }
+
   return typeMap[type] || `Exercise Type #${type}`;
 }
 
@@ -228,10 +286,17 @@ export interface MetricDetailSummary {
 /**
  * Returns a list of all sub-record metric metadata summaries for a given workout sub-records collection.
  */
-export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
+export function getSubRecordSummaries(
+  subRecords?: any,
+  t?: (key: string, params?: Record<string, string | number>) => string
+): MetricDetailSummary[] {
   if (!subRecords) return [];
 
   const summaries: MetricDetailSummary[] = [];
+
+  const getName = (key: string, defaultName: string) => (t ? t(`metrics.${key}`) : defaultName);
+  const getZero = () => (t ? t('metrics.zeroRecords') : '0 records');
+  const getCountStr = (count: number) => (t ? t('metrics.recordsCount', { count }) : `${count} record(s)`);
 
   // Heart Rate
   const hrRecords = subRecords.heartRateRecords || [];
@@ -255,20 +320,22 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
     }
     const avg = sampleCount > 0 ? Math.round(bpmSum / sampleCount) : null;
     const detailStr = avg
-      ? `Avg: ${avg} bpm (Range: ${minBpm}-${maxBpm} bpm, ${sampleCount} samples)`
-      : `${hrRecords.length} record(s)`;
-    summaries.push({ name: 'Heart Rate Records', count: hrRecords.length, details: detailStr });
+      ? t
+        ? t('metrics.avgBpmDetail', { avg, min: minBpm, max: maxBpm, count: sampleCount })
+        : `Avg: ${avg} bpm (Range: ${minBpm}-${maxBpm} bpm, ${sampleCount} samples)`
+      : getCountStr(hrRecords.length);
+    summaries.push({ name: getName('heartRateRecords', 'Heart Rate Records'), count: hrRecords.length, details: detailStr });
   } else {
-    summaries.push({ name: 'Heart Rate Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('heartRateRecords', 'Heart Rate Records'), count: 0, details: getZero() });
   }
 
   // Distance
   const distRecords = subRecords.distanceRecords || [];
   if (distRecords.length > 0) {
     const formatted = calculateTotalDistance(distRecords);
-    summaries.push({ name: 'Distance Records', count: distRecords.length, details: formatted });
+    summaries.push({ name: getName('distanceRecords', 'Distance Records'), count: distRecords.length, details: formatted });
   } else {
-    summaries.push({ name: 'Distance Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('distanceRecords', 'Distance Records'), count: 0, details: getZero() });
   }
 
   // Calories
@@ -277,13 +344,16 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
   const totalCalCount = totalCal.length + activeCal.length;
   if (totalCalCount > 0) {
     const formatted = calculateTotalCalories(totalCal, activeCal);
+    const detailStr = t
+      ? t('metrics.caloriesDetail', { formatted, total: totalCal.length, active: activeCal.length })
+      : `${formatted} (${totalCal.length} total, ${activeCal.length} active)`;
     summaries.push({
-      name: 'Calorie Records',
+      name: getName('calorieRecords', 'Calorie Records'),
       count: totalCalCount,
-      details: `${formatted} (${totalCal.length} total, ${activeCal.length} active)`,
+      details: detailStr,
     });
   } else {
-    summaries.push({ name: 'Calorie Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('calorieRecords', 'Calorie Records'), count: 0, details: getZero() });
   }
 
   // Speed
@@ -308,13 +378,16 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
         }
       }
     }
+    const detailStr = maxSpeedKmh > 0
+      ? (t ? t('metrics.maxSpeedDetail', { speed: maxSpeedKmh.toFixed(1), count: sampleCount }) : `Max speed: ${maxSpeedKmh.toFixed(1)} km/h (${sampleCount} samples)`)
+      : getCountStr(speedRecords.length);
     summaries.push({
-      name: 'Speed Records',
+      name: getName('speedRecords', 'Speed Records'),
       count: speedRecords.length,
-      details: maxSpeedKmh > 0 ? `Max speed: ${maxSpeedKmh.toFixed(1)} km/h (${sampleCount} samples)` : `${speedRecords.length} record(s)`,
+      details: detailStr,
     });
   } else {
-    summaries.push({ name: 'Speed Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('speedRecords', 'Speed Records'), count: 0, details: getZero() });
   }
 
   // Steps
@@ -326,17 +399,18 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
         totalSteps += (r as any).count;
       }
     }
-    summaries.push({ name: 'Steps Records', count: stepsRecords.length, details: `${totalSteps.toLocaleString()} steps` });
+    const detailStr = t ? t('metrics.stepsCount', { count: totalSteps.toLocaleString() }) : `${totalSteps.toLocaleString()} steps`;
+    summaries.push({ name: getName('stepsRecords', 'Steps Records'), count: stepsRecords.length, details: detailStr });
   } else {
-    summaries.push({ name: 'Steps Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('stepsRecords', 'Steps Records'), count: 0, details: getZero() });
   }
 
   // Steps Cadence
   const stepsCadenceRecords = subRecords.stepsCadenceRecords || [];
   summaries.push({
-    name: 'Steps Cadence Records',
+    name: getName('stepsCadenceRecords', 'Steps Cadence Records'),
     count: stepsCadenceRecords.length,
-    details: stepsCadenceRecords.length > 0 ? `${stepsCadenceRecords.length} record(s)` : '0 records',
+    details: stepsCadenceRecords.length > 0 ? getCountStr(stepsCadenceRecords.length) : getZero(),
   });
 
   // Elevation Gained
@@ -349,9 +423,10 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
         totalElevMeters += elev.inMeters;
       }
     }
-    summaries.push({ name: 'Elevation Gained Records', count: elevationRecords.length, details: `${totalElevMeters.toFixed(1)} m` });
+    const detailStr = t ? t('metrics.elevationDetail', { meters: totalElevMeters.toFixed(1) }) : `${totalElevMeters.toFixed(1)} m`;
+    summaries.push({ name: getName('elevationGainedRecords', 'Elevation Gained Records'), count: elevationRecords.length, details: detailStr });
   } else {
-    summaries.push({ name: 'Elevation Gained Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('elevationGainedRecords', 'Elevation Gained Records'), count: 0, details: getZero() });
   }
 
   // Floors Climbed
@@ -363,57 +438,58 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
         totalFloors += (r as any).floors;
       }
     }
-    summaries.push({ name: 'Floors Climbed Records', count: floorsRecords.length, details: `${totalFloors} floors` });
+    const detailStr = t ? t('metrics.floorsCount', { count: totalFloors }) : `${totalFloors} floors`;
+    summaries.push({ name: getName('floorsClimbedRecords', 'Floors Climbed Records'), count: floorsRecords.length, details: detailStr });
   } else {
-    summaries.push({ name: 'Floors Climbed Records', count: 0, details: '0 records' });
+    summaries.push({ name: getName('floorsClimbedRecords', 'Floors Climbed Records'), count: 0, details: getZero() });
   }
 
   // Power
   const powerRecords = subRecords.powerRecords || [];
   summaries.push({
-    name: 'Power Records',
+    name: getName('powerRecords', 'Power Records'),
     count: powerRecords.length,
-    details: powerRecords.length > 0 ? `${powerRecords.length} record(s)` : '0 records',
+    details: powerRecords.length > 0 ? getCountStr(powerRecords.length) : getZero(),
   });
 
   // Cycling Cadence
   const cyclingCadenceRecords = subRecords.cyclingPedalingCadenceRecords || [];
   summaries.push({
-    name: 'Cycling Cadence Records',
+    name: getName('cyclingCadenceRecords', 'Cycling Cadence Records'),
     count: cyclingCadenceRecords.length,
-    details: cyclingCadenceRecords.length > 0 ? `${cyclingCadenceRecords.length} record(s)` : '0 records',
+    details: cyclingCadenceRecords.length > 0 ? getCountStr(cyclingCadenceRecords.length) : getZero(),
   });
 
   // Wheelchair Pushes
   const wheelchairRecords = subRecords.wheelchairPushesRecords || [];
   summaries.push({
-    name: 'Wheelchair Pushes Records',
+    name: getName('wheelchairPushesRecords', 'Wheelchair Pushes Records'),
     count: wheelchairRecords.length,
-    details: wheelchairRecords.length > 0 ? `${wheelchairRecords.length} record(s)` : '0 records',
+    details: wheelchairRecords.length > 0 ? getCountStr(wheelchairRecords.length) : getZero(),
   });
 
   // VO2 Max
   const vo2Records = subRecords.vo2MaxRecords || [];
   summaries.push({
-    name: 'VO2 Max Records',
+    name: getName('vo2MaxRecords', 'VO2 Max Records'),
     count: vo2Records.length,
-    details: vo2Records.length > 0 ? `${vo2Records.length} record(s)` : '0 records',
+    details: vo2Records.length > 0 ? getCountStr(vo2Records.length) : getZero(),
   });
 
   // HRV
   const hrvRecords = subRecords.heartRateVariabilityRecords || [];
   summaries.push({
-    name: 'HRV (RMSSD) Records',
+    name: getName('hrvRecords', 'HRV (RMSSD) Records'),
     count: hrvRecords.length,
-    details: hrvRecords.length > 0 ? `${hrvRecords.length} record(s)` : '0 records',
+    details: hrvRecords.length > 0 ? getCountStr(hrvRecords.length) : getZero(),
   });
 
   // Resting HR
   const restingHrRecords = subRecords.restingHeartRateRecords || [];
   summaries.push({
-    name: 'Resting HR Records',
+    name: getName('restingHrRecords', 'Resting HR Records'),
     count: restingHrRecords.length,
-    details: restingHrRecords.length > 0 ? `${restingHrRecords.length} record(s)` : '0 records',
+    details: restingHrRecords.length > 0 ? getCountStr(restingHrRecords.length) : getZero(),
   });
 
   return summaries;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, StatusBar } from 'react-native';
+import { StyleSheet, View, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   PaperProvider,
@@ -13,6 +13,7 @@ import {
   Portal,
   Dialog,
   RadioButton,
+  Divider,
   useTheme,
 } from 'react-native-paper';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
@@ -23,24 +24,28 @@ import { healthConnectService } from './services/HealthConnectService';
 import { groupOverlappingSessions } from './utils/MergeAlgorithm';
 import { WorkoutConflictGroup, DetailedWorkoutSession } from './types';
 import { SessionList } from './components/SessionList';
+import { LanguageProvider, useLanguage, PreferenceCode } from './i18n';
 
 export default function AppWrapper() {
   return (
     <SafeAreaProvider>
-      <PaperProvider
-        theme={MD3LightTheme}
-        settings={{
-          icon: (props) => <MaterialIcon {...props} />,
-        }}
-      >
-        <App />
-      </PaperProvider>
+      <LanguageProvider>
+        <PaperProvider
+          theme={MD3LightTheme}
+          settings={{
+            icon: (props) => <MaterialIcon {...props} />,
+          }}
+        >
+          <App />
+        </PaperProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
 
 function App() {
   const theme = useTheme();
+  const { t, preference, setPreference, systemLanguage } = useLanguage();
 
   // Permissions state
   const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
@@ -118,10 +123,10 @@ function App() {
       }
     } catch (err: any) {
       console.error('Error during initial permission check:', err);
-      setPermissionError(err.message || 'Failed to communicate with Health Connect');
+      setPermissionError(err.message || t('permissions.sdkError'));
       setHasPermissions(false);
     }
-  }, [loadWorkoutSessions]);
+  }, [loadWorkoutSessions, t]);
 
   useEffect(() => {
     checkInitialPermissions();
@@ -140,7 +145,7 @@ function App() {
         loadWorkoutSessions();
       }
     } catch (err: any) {
-      setPermissionError(err.message || 'Permission request was denied');
+      setPermissionError(err.message || t('permissions.deniedError'));
     }
   };
 
@@ -161,7 +166,7 @@ function App() {
 
       {/* App Bar Header */}
       <Appbar.Header elevated style={{ backgroundColor: theme.colors.surface, paddingTop: 0, height: 56 }}>
-        <Appbar.Content title="Workout Deduplicator" titleStyle={styles.appTitle} />
+        <Appbar.Content title={t('app.title')} titleStyle={styles.appTitle} />
         {hasPermissions && (
           <>
             <Appbar.Action icon="tune" onPress={() => setSettingsVisible(true)} />
@@ -175,11 +180,10 @@ function App() {
         <View style={styles.permissionContainer}>
           <Surface style={styles.permissionCard} elevation={2}>
             <Text variant="headlineSmall" style={styles.permissionTitle}>
-              Health Connect Access Required
+              {t('permissions.title')}
             </Text>
             <Text variant="bodyMedium" style={styles.permissionDesc}>
-              This app requires Health Connect permissions to read and write all exercise sessions
-              and health metrics to detect and merge duplicate workouts without losing data.
+              {t('permissions.description')}
             </Text>
 
             {permissionError && (
@@ -194,7 +198,7 @@ function App() {
               style={styles.grantButton}
               onPress={handleRequestPermissions}
             >
-              Grant Permissions
+              {t('permissions.grantButton')}
             </Button>
           </Surface>
         </View>
@@ -203,7 +207,7 @@ function App() {
           {/* Range Selection Segment */}
           <Surface style={styles.filterBar} elevation={1}>
             <Text variant="labelMedium" style={styles.filterLabel}>
-              Scan Window:
+              {t('app.scanWindow')}
             </Text>
             <SegmentedButtons
               value={rangeDays}
@@ -212,9 +216,9 @@ function App() {
                 loadWorkoutSessions(val);
               }}
               buttons={[
-                { value: '3', label: '3 Days' },
-                { value: '7', label: '7 Days' },
-                { value: '30', label: '30 Days' },
+                { value: '3', label: t('app.days3') },
+                { value: '7', label: t('app.days7') },
+                { value: '30', label: t('app.days30') },
               ]}
               style={styles.segmentedButtons}
             />
@@ -230,27 +234,49 @@ function App() {
         </View>
       )}
 
-      {/* Settings / Tolerance Modal Dialog */}
+      {/* Settings / Tolerance & Language Dialog */}
       <Portal>
-        <Dialog visible={settingsVisible} onDismiss={() => setSettingsVisible(false)}>
-          <Dialog.Title>Merge Settings</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">
-              Time Tolerance (Max Gap Between Workouts):
-            </Text>
+        <Dialog visible={settingsVisible} onDismiss={() => setSettingsVisible(false)} style={styles.dialog}>
+          <Dialog.Title>{t('settings.title')}</Dialog.Title>
+          <Dialog.ScrollArea style={styles.dialogScrollArea}>
+            <ScrollView contentContainerStyle={styles.dialogScrollContent}>
+              {/* Section 1: Language Preference */}
+              <Text variant="titleSmall" style={styles.settingsSectionTitle}>
+                {t('settings.languageHeader')}
+              </Text>
+              <RadioButton.Group
+                onValueChange={(val: string) => setPreference(val as PreferenceCode)}
+                value={preference}
+              >
+                <RadioButton.Item
+                  label={t('settings.systemDefault', {
+                    lang: systemLanguage === 'pl' ? 'Polski' : 'English',
+                  })}
+                  value="system"
+                />
+                <RadioButton.Item label={t('settings.langEn')} value="en" />
+                <RadioButton.Item label={t('settings.langPl')} value="pl" />
+              </RadioButton.Group>
 
-            <RadioButton.Group
-              onValueChange={(val: string) => handleToleranceChange(parseInt(val, 10))}
-              value={toleranceMinutes.toString()}
-            >
-              <RadioButton.Item label="1 Minute (Exact overlap)" value="1" />
-              <RadioButton.Item label="5 Minutes (Default)" value="5" />
-              <RadioButton.Item label="10 Minutes (Loose tolerance)" value="10" />
-              <RadioButton.Item label="15 Minutes" value="15" />
-            </RadioButton.Group>
-          </Dialog.Content>
+              <Divider style={styles.settingsDivider} />
+
+              {/* Section 2: Time Tolerance */}
+              <Text variant="titleSmall" style={styles.settingsSectionTitle}>
+                {t('settings.toleranceHeader')}
+              </Text>
+              <RadioButton.Group
+                onValueChange={(val: string) => handleToleranceChange(parseInt(val, 10))}
+                value={toleranceMinutes.toString()}
+              >
+                <RadioButton.Item label={t('settings.tolerance1')} value="1" />
+                <RadioButton.Item label={t('settings.tolerance5')} value="5" />
+                <RadioButton.Item label={t('settings.tolerance10')} value="10" />
+                <RadioButton.Item label={t('settings.tolerance15')} value="15" />
+              </RadioButton.Group>
+            </ScrollView>
+          </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button onPress={() => setSettingsVisible(false)}>Done</Button>
+            <Button onPress={() => setSettingsVisible(false)}>{t('settings.done')}</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -312,5 +338,25 @@ const styles = StyleSheet.create({
     color: '#B00020',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  dialog: {
+    borderRadius: 20,
+    maxHeight: '85%',
+  },
+  dialogScrollArea: {
+    paddingHorizontal: 0,
+    maxHeight: 400,
+  },
+  dialogScrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+  },
+  settingsSectionTitle: {
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  settingsDivider: {
+    marginVertical: 12,
   },
 });
