@@ -12,6 +12,7 @@ import {
   useTheme,
   Snackbar,
   Checkbox,
+  SegmentedButtons,
 } from 'react-native-paper';
 import { format } from 'date-fns';
 import {
@@ -28,6 +29,7 @@ import {
   calculateAvgHeartRate,
   calculateTotalDistance,
   calculateTotalCalories,
+  formatExerciseType,
 } from '../utils/FormatUtils';
 import { MergeConfirmationModal } from './MergeConfirmationModal';
 
@@ -287,6 +289,69 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
   );
 };
 
+interface StandaloneCardProps {
+  group: WorkoutConflictGroup;
+}
+
+const StandaloneCard: React.FC<StandaloneCardProps> = ({ group }) => {
+  const theme = useTheme();
+  const sessionItem = group.sessions[0];
+  if (!sessionItem) return null;
+
+  const session = sessionItem.session;
+  const subRecords = sessionItem.subRecords;
+
+  const startTimeFormatted = format(new Date(session.startTime), 'MMM d, HH:mm');
+  const endTimeFormatted = format(new Date(session.endTime), 'HH:mm');
+  const appName = formatAppOrigin(session.metadata?.dataOrigin);
+  const exerciseTypeName = formatExerciseType(session.exerciseType);
+
+  const hrVal = calculateAvgHeartRate(subRecords.heartRateRecords);
+  const distVal = calculateTotalDistance(subRecords.distanceRecords);
+  const calVal = calculateTotalCalories(
+    subRecords.totalCaloriesRecords,
+    subRecords.activeCaloriesRecords
+  );
+
+  return (
+    <Card style={styles.card} mode="outlined">
+      <Card.Title
+        title={session.title || exerciseTypeName}
+        titleStyle={styles.cardTitle}
+        subtitle={`${startTimeFormatted} - ${endTimeFormatted}`}
+        right={() => (
+          <View style={styles.headerBadgeContainer}>
+            <CategoryBadge category={group.detectedCategory} label={group.categoryLabel} />
+          </View>
+        )}
+      />
+      <Card.Content>
+        <Text variant="bodySmall" style={[styles.appSourceText, { color: theme.colors.primary }]}>
+          Source: {appName} • {exerciseTypeName}
+        </Text>
+
+        {session.notes ? (
+          <Text variant="bodyMedium" style={styles.notes}>
+            {session.notes}
+          </Text>
+        ) : null}
+
+        <View style={styles.badgeRow}>
+          <Chip compact icon="heart-pulse" style={styles.metricBadge}>
+            HR: {hrVal}
+          </Chip>
+          <Chip compact icon="map-marker-distance" style={styles.metricBadge}>
+            Dist: {distVal}
+          </Chip>
+          <Chip compact icon="fire" style={styles.metricBadge}>
+            Cal: {calVal}
+          </Chip>
+        </View>
+      </Card.Content>
+    </Card>
+  );
+};
+
 export const SessionList: React.FC<SessionListProps> = ({
   groups,
   loading,
@@ -294,6 +359,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   onMergeSuccess,
 }) => {
   const theme = useTheme();
+  const [activeTab, setActiveTab] = useState<'overlapping' | 'standalone'>('overlapping');
   const [mergingGroupId, setMergingGroupId] = useState<string | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
 
@@ -305,6 +371,15 @@ export const SessionList: React.FC<SessionListProps> = ({
 
   const conflicts = groups.filter((g: WorkoutConflictGroup) => g.status === 'conflict_detected');
   const cleanSessions = groups.filter((g: WorkoutConflictGroup) => g.status !== 'conflict_detected');
+
+  // Update default tab based on whether there are overlapping conflicts
+  useEffect(() => {
+    if (conflicts.length === 0) {
+      setActiveTab('standalone');
+    } else {
+      setActiveTab('overlapping');
+    }
+  }, [groups]);
 
   // Triggered when user clicks "Merge X Workouts" button -> Opens Confirmation Modal
   const handleInitiateMergeGroup = (group: WorkoutConflictGroup, selectedSessionIds: string[]) => {
@@ -385,12 +460,58 @@ export const SessionList: React.FC<SessionListProps> = ({
         </View>
       </Surface>
 
-      {conflicts.length === 0 ? (
+      {/* Tab Selector */}
+      <View style={styles.tabContainer}>
+        <SegmentedButtons
+          value={activeTab}
+          onValueChange={(val: string) => setActiveTab(val as 'overlapping' | 'standalone')}
+          buttons={[
+            {
+              value: 'overlapping',
+              label: `Overlapping Workouts (${conflicts.length})`,
+              icon: 'layers-triple-outline',
+            },
+            {
+              value: 'standalone',
+              label: `Standalone Workouts (${cleanSessions.length})`,
+              icon: 'check-circle-outline',
+            },
+          ]}
+          style={styles.segmentedButtons}
+        />
+      </View>
+
+      {/* Tab Content */}
+      {activeTab === 'overlapping' ? (
+        conflicts.length === 0 ? (
+          <ScrollView contentContainerStyle={styles.emptyContainer}>
+            <IconButton icon="check-decagram" size={64} iconColor={theme.colors.primary} />
+            <Text variant="titleLarge">No Overlapping Conflicts Found</Text>
+            <Text variant="bodyMedium" style={styles.emptySubtitle}>
+              All workout sessions in the selected range are distinct without time conflicts.
+            </Text>
+            <Button mode="outlined" style={{ marginTop: 16 }} onPress={onRefresh}>
+              Re-scan Workouts
+            </Button>
+          </ScrollView>
+        ) : (
+          <ScrollView contentContainerStyle={styles.listContent}>
+            {conflicts.map((group) => (
+              <ConflictCard
+                key={group.id}
+                group={group}
+                isMerging={mergingGroupId === group.id}
+                onMergeGroup={handleInitiateMergeGroup}
+              />
+            ))}
+          </ScrollView>
+        )
+      ) : cleanSessions.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContainer}>
-          <IconButton icon="check-decagram" size={64} iconColor={theme.colors.primary} />
-          <Text variant="titleLarge">No Overlapping Conflicts Found</Text>
+          <IconButton icon="dumbbell" size={64} iconColor={theme.colors.primary} />
+          <Text variant="titleLarge">No Standalone Workouts Found</Text>
           <Text variant="bodyMedium" style={styles.emptySubtitle}>
-            All workout sessions in the selected range are distinct without time conflicts.
+            There are no single workout sessions in the selected scan window.
           </Text>
           <Button mode="outlined" style={{ marginTop: 16 }} onPress={onRefresh}>
             Re-scan Workouts
@@ -398,16 +519,8 @@ export const SessionList: React.FC<SessionListProps> = ({
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>
-          <Text variant="titleMedium" style={styles.sectionHeader}>
-            Overlapping Workouts ({conflicts.length})
-          </Text>
-          {conflicts.map((group) => (
-            <ConflictCard
-              key={group.id}
-              group={group}
-              isMerging={mergingGroupId === group.id}
-              onMergeGroup={handleInitiateMergeGroup}
-            />
+          {cleanSessions.map((group) => (
+            <StandaloneCard key={group.id} group={group} />
           ))}
         </ScrollView>
       )}
@@ -458,6 +571,13 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
     borderRadius: 12,
+  },
+  tabContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  segmentedButtons: {
+    width: '100%',
   },
   statsRow: {
     flexDirection: 'row',
