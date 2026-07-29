@@ -418,3 +418,28 @@ export function getSubRecordSummaries(subRecords?: any): MetricDetailSummary[] {
 
   return summaries;
 }
+
+/**
+ * Converts a MergedWorkoutPayload sub-records arrays into a WorkoutSubRecords structure
+ * compatible with getSubRecordSummaries.
+ */
+export function convertPayloadToSubRecords(payload?: any): any {
+  if (!payload) return {};
+  return {
+    heartRateRecords: payload.heartRateToInsert || [],
+    distanceRecords: payload.distanceToInsert || [],
+    speedRecords: payload.speedToInsert || [],
+    totalCaloriesRecords: payload.totalCaloriesToInsert || [],
+    activeCaloriesRecords: payload.activeCaloriesToInsert || [],
+    stepsRecords: payload.stepsToInsert || [],
+    stepsCadenceRecords: payload.stepsCadenceToInsert || [],
+    elevationGainedRecords: payload.elevationGainedToInsert || [],
+    floorsClimbedRecords: payload.floorsClimbedToInsert || [],
+    powerRecords: payload.powerToInsert || [],
+    cyclingPedalingCadenceRecords: payload.cyclingPedalingCadenceToInsert || [],
+    wheelchairPushesRecords: payload.wheelchairPushesToInsert || [],
+    vo2MaxRecords: payload.vo2MaxToInsert || [],
+    heartRateVariabilityRecords: payload.heartRateVariabilityToInsert || [],
+    restingHeartRateRecords: payload.restingHeartRateToInsert || [],
+  };
+}

@@ -13,7 +13,12 @@ import {
 } from 'react-native-paper';
 import { format } from 'date-fns';
 import { WorkoutConflictGroup, MergedWorkoutPayload, DetailedWorkoutSession } from '../types';
-import { formatAppOrigin, formatExerciseType, getSubRecordSummaries } from '../utils/FormatUtils';
+import {
+  formatAppOrigin,
+  formatExerciseType,
+  getSubRecordSummaries,
+  convertPayloadToSubRecords,
+} from '../utils/FormatUtils';
 
 interface MergeConfirmationModalProps {
   visible: boolean;
@@ -73,6 +78,9 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
   const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm:ss');
 
   const mergedSummary = payload?.mergedSummary;
+  const mergedSubSummaries = payload
+    ? getSubRecordSummaries(convertPayloadToSubRecords(payload))
+    : [];
 
   return (
     <Portal>
@@ -149,15 +157,90 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
             >
               {showDetails
                 ? 'Hide Full Workout Details'
-                : `Show Details (${selectedSessions.length} Workouts & Metadata)`}
+                : `Show Details (${selectedSessions.length} Workouts & Merged Output)`}
             </Button>
 
             {/* Expanded Workout List & All Metadata */}
             {showDetails && (
               <View style={styles.detailsContainer}>
                 <Divider style={styles.detailsDivider} />
+
+                {/* SECTION 1: FINAL MERGED OUTPUT METADATA */}
+                {payload && (
+                  <Surface style={styles.mergedOutputDetailCard} elevation={2}>
+                    <View style={styles.workoutDetailHeader}>
+                      <Text variant="titleMedium" style={[styles.workoutTitle, { color: '#0369A1' }]}>
+                        Master Merged Workout (To Be Inserted)
+                      </Text>
+                      <Chip compact icon="check-decagram" style={styles.outputChip}>
+                        Final Output
+                      </Chip>
+                    </View>
+
+                    <View style={styles.metadataGrid}>
+                      <Text variant="bodySmall" style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Session Title: </Text>
+                        {payload.sessionToInsert.title || 'Merged Workout'}
+                      </Text>
+
+                      <Text variant="bodySmall" style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Exercise Type: </Text>
+                        {formatExerciseType(payload.sessionToInsert.exerciseType)} (ID: {payload.sessionToInsert.exerciseType})
+                      </Text>
+
+                      <Text variant="bodySmall" style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Target Time Window: </Text>
+                        {format(new Date(payload.sessionToInsert.startTime), 'HH:mm:ss')} -{' '}
+                        {format(new Date(payload.sessionToInsert.endTime), 'HH:mm:ss')}
+                      </Text>
+
+                      <Text variant="bodySmall" style={styles.metaRow}>
+                        <Text style={styles.metaLabel}>Category Resolution: </Text>
+                        {categoryLabel}
+                      </Text>
+
+                      {mergedSummary?.contributingSources && mergedSummary.contributingSources.length > 0 ? (
+                        <View style={{ marginTop: 4 }}>
+                          <Text style={styles.metaLabel}>Metric Source Attribution: </Text>
+                          {mergedSummary.contributingSources.map((cs, cIdx) => (
+                            <Text key={cIdx} variant="bodySmall" style={{ marginLeft: 8, color: theme.colors.primary }}>
+                              • {cs.metric}: {cs.source}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+
+                    <Divider style={styles.subDivider} />
+
+                    <Text variant="labelSmall" style={styles.subHeaderTitle}>
+                      Health Connect Records To Be Inserted ({mergedSubSummaries.filter((s) => s.count > 0).length} metric types):
+                    </Text>
+
+                    <View style={styles.subRecordList}>
+                      {mergedSubSummaries.map((sub, sIdx) => (
+                        <View key={sIdx} style={styles.subRecordRow}>
+                          <Text
+                            variant="bodySmall"
+                            style={[
+                              styles.subRecordName,
+                              { color: sub.count > 0 ? '#0369A1' : theme.colors.outline },
+                            ]}
+                          >
+                            • {sub.name}:
+                          </Text>
+                          <Text variant="bodySmall" style={styles.subRecordValue}>
+                            {sub.details}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </Surface>
+                )}
+
+                {/* SECTION 2: ORIGINAL INPUT WORKOUTS */}
                 <Text variant="titleMedium" style={styles.detailsHeader}>
-                  Workouts To Be Merged & Deleted ({selectedSessions.length})
+                  Original Workouts To Be Deleted ({selectedSessions.length})
                 </Text>
 
                 {selectedSessions.map((item, idx) => {
@@ -379,7 +462,19 @@ const styles = StyleSheet.create({
   },
   detailsHeader: {
     fontWeight: '700',
+    marginTop: 8,
     marginBottom: 12,
+  },
+  mergedOutputDetailCard: {
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+    borderWidth: 1,
+  },
+  outputChip: {
+    backgroundColor: '#0284C7',
   },
   workoutDetailCard: {
     padding: 12,
@@ -409,6 +504,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     marginBottom: 4,
+    flexWrap: 'wrap',
   },
   metaLabel: {
     fontWeight: '700',
@@ -426,14 +522,21 @@ const styles = StyleSheet.create({
   },
   subRecordRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 6,
+    width: '100%',
   },
   subRecordName: {
     fontWeight: '600',
+    marginRight: 8,
+    flexShrink: 0,
   },
   subRecordValue: {
     opacity: 0.8,
+    flex: 1,
+    textAlign: 'right',
+    flexWrap: 'wrap',
   },
   dialogActions: {
     paddingHorizontal: 24,
