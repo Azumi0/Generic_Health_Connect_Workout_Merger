@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --noEmit false --module commonjs --target es2020 --jsx react-jsx --outDir ./dist && node ./dist/utils/__tests__/testMergeAlgorithm.js && node ./dist/components/__tests__/testCategoryBadge.js && node ./dist/i18n/__tests__/testI18n.js"
+    "test": "jest"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
@@ -30,8 +30,11 @@
     "@babel/core": "8.0.1",
     "@babel/runtime": "^8.0.0",
     "@expo/config-plugins": "^57.0.6",
+    "@types/jest": "^29.5.14",
     "@types/react": "19.2.17",
     "babel-preset-expo": "57.0.4",
+    "jest": "^29.7.0",
+    "jest-expo": "^57.0.2",
     "typescript": "7.0.2"
   },
   "private": true

@@ -1,9 +1,7 @@
 import { ActivityCategory, ActivityCategoryLabel } from '../../types';
 import { getCategoryBadgeData } from '../CategoryBadgeUtils';
 
-function runTests() {
-  console.log('--- Running CategoryBadge Utility Tests ---');
-
+describe('CategoryBadge Utility', () => {
   const t = (key: string) => {
     const translations: Record<string, string> = {
       'categories.indoorTreadmill': 'Indoor Treadmill',
@@ -18,30 +16,55 @@ function runTests() {
     return translations[key] || key;
   };
 
-  const indoor = getCategoryBadgeData(ActivityCategory.INDOOR_MACHINE, ActivityCategoryLabel.INDOOR_TREADMILL, t);
-  console.assert(indoor.icon === 'run-fast', 'Indoor treadmill icon should be run-fast');
-  console.assert(indoor.displayLabel === 'Indoor Treadmill', 'Indoor treadmill label should translate correctly');
+  it('should return correct badge data for indoor treadmill', () => {
+    const indoor = getCategoryBadgeData(
+      ActivityCategory.INDOOR_MACHINE,
+      ActivityCategoryLabel.INDOOR_TREADMILL,
+      t
+    );
+    expect(indoor.icon).toBe('run-fast');
+    expect(indoor.displayLabel).toBe('Indoor Treadmill');
+  });
 
-  const indoorDefault = getCategoryBadgeData(ActivityCategory.INDOOR_MACHINE, ActivityCategoryLabel.INDOOR_EQUIPMENT, t);
-  console.assert(indoorDefault.displayLabel === 'Indoor Equipment', 'Indoor equipment label should translate correctly');
+  it('should return correct badge data for default indoor equipment', () => {
+    const indoorDefault = getCategoryBadgeData(
+      ActivityCategory.INDOOR_MACHINE,
+      ActivityCategoryLabel.INDOOR_EQUIPMENT,
+      t
+    );
+    expect(indoorDefault.displayLabel).toBe('Indoor Equipment');
+  });
 
-  const outdoor = getCategoryBadgeData(ActivityCategory.OUTDOOR_SPATIAL, ActivityCategoryLabel.OUTDOOR_GPS_TRACK, t);
-  console.assert(outdoor.icon === 'compass', 'Outdoor spatial icon should be compass');
-  console.assert(outdoor.displayLabel === 'Outdoor GPS', 'Outdoor GPS label should translate correctly');
+  it('should return correct badge data for outdoor spatial / GPS track', () => {
+    const outdoor = getCategoryBadgeData(
+      ActivityCategory.OUTDOOR_SPATIAL,
+      ActivityCategoryLabel.OUTDOOR_GPS_TRACK,
+      t
+    );
+    expect(outdoor.icon).toBe('compass');
+    expect(outdoor.displayLabel).toBe('Outdoor GPS');
+  });
 
-  const stationary = getCategoryBadgeData(ActivityCategory.STATIONARY_NON_DISTANCE, ActivityCategoryLabel.STATIONARY_STRENGTH, t);
-  console.assert(stationary.icon === 'dumbbell', 'Stationary category icon should be dumbbell');
-  console.assert(stationary.displayLabel === 'Stationary Strength', 'Stationary strength label should translate correctly');
+  it('should return correct badge data for stationary strength', () => {
+    const stationary = getCategoryBadgeData(
+      ActivityCategory.STATIONARY_NON_DISTANCE,
+      ActivityCategoryLabel.STATIONARY_STRENGTH,
+      t
+    );
+    expect(stationary.icon).toBe('dumbbell');
+    expect(stationary.displayLabel).toBe('Stationary Strength');
+  });
 
-  const conflict = getCategoryBadgeData(undefined, ActivityCategoryLabel.CONFLICT, t);
-  console.assert(conflict.displayLabel === 'Conflict', 'Conflict label should fallback to translation');
+  it('should fallback to translation for conflict category label', () => {
+    const conflict = getCategoryBadgeData(undefined, ActivityCategoryLabel.CONFLICT, t);
+    expect(conflict.displayLabel).toBe('Conflict');
+  });
 
-  const unknown = getCategoryBadgeData(undefined, undefined, t);
-  const merged = getCategoryBadgeData(undefined, ActivityCategoryLabel.MERGED_WORKOUT, t);
-  console.assert(merged.displayLabel === 'Merged Workout', 'Merged workout label should translate correctly');
-  console.assert(unknown.displayLabel === 'Conflict', 'Undefined category should fallback to conflict label');
+  it('should return correct badge data for merged workout and undefined category', () => {
+    const merged = getCategoryBadgeData(undefined, ActivityCategoryLabel.MERGED_WORKOUT, t);
+    expect(merged.displayLabel).toBe('Merged Workout');
 
-  console.log('✅ ALL CATEGORY BADGE TESTS PASSED SUCCESSFULLY!');
-}
-
-runTests();
+    const unknown = getCategoryBadgeData(undefined, undefined, t);
+    expect(unknown.displayLabel).toBe('Conflict');
+  });
+});
