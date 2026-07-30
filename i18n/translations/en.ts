@@ -54,6 +54,7 @@ export const en = {
     mergeSelected: 'Merge Selected ({count})',
     selectAtLeastOne: 'At least 1 session must be selected to merge',
     merging: 'Merging...',
+    noWorkoutsFound: 'No workout sessions were found in Health Connect.',
   },
   confirmationModal: {
     title: 'Confirm Irreversible Merge',

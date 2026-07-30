@@ -528,7 +528,7 @@ export const SessionList: React.FC<SessionListProps> = ({
           <IconButton icon="package-variant" size={64} iconColor={theme.colors.outline} />
           <Text variant="titleLarge">{t('sessionList.emptyTitle')}</Text>
           <Text variant="bodyMedium" style={styles.emptySubtitle}>
-            No workout sessions were found in Health Connect.
+            {t('sessionList.noWorkoutsFound')}
           </Text>
           <Button mode="outlined" style={{ marginTop: 16 }} onPress={onRefresh}>
             {t('sessionList.rescanButton')}

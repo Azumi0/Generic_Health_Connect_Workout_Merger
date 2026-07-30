@@ -56,6 +56,7 @@ export const pl: TranslationKeys = {
     mergeSelected: 'Scal Wybrane ({count})',
     selectAtLeastOne: 'Należy wybrać co najmniej 1 sesję do scalenia',
     merging: 'Scalanie...',
+    noWorkoutsFound: 'Nie znaleziono sesji treningowych w Health Connect.',
   },
   confirmationModal: {
     title: 'Potwierdź Nieodwracalne Scalanie',
