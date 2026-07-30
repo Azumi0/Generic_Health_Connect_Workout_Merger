@@ -1,4 +1,4 @@
-import { ActivityCategory, DetailedWorkoutSession, WorkoutConflictGroup } from '../../types';
+import { ActivityCategory, ActivityCategoryLabel, DetailedWorkoutSession, WorkoutConflictGroup } from '../../types';
 import {
   detectActivityCategory,
   generateMergedWorkoutPayload,
@@ -124,7 +124,7 @@ function runTests() {
   // Test Category Detection
   const cat = detectActivityCategory([sessionA, sessionB]);
   console.assert(cat.category === ActivityCategory.INDOOR_MACHINE, 'Should detect INDOOR_MACHINE category');
-  console.assert(cat.label === 'Indoor Treadmill', `Expected "Indoor Treadmill", got "${cat.label}"`);
+  console.assert(cat.label === ActivityCategoryLabel.INDOOR_TREADMILL, `Expected ${ActivityCategoryLabel.INDOOR_TREADMILL}, got ${cat.label}`);
 
   // Test Merged Payload
   const payload = generateMergedWorkoutPayload(conflictGroups[0]);

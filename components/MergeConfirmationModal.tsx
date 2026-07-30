@@ -12,13 +12,14 @@ import {
   IconButton,
 } from 'react-native-paper';
 import { format } from 'date-fns';
-import { WorkoutConflictGroup, MergedWorkoutPayload, DetailedWorkoutSession } from '../types';
+import { WorkoutConflictGroup, MergedWorkoutPayload, DetailedWorkoutSession, ActivityCategoryLabel } from '../types';
 import {
   formatAppOrigin,
   formatExerciseType,
   getSubRecordSummaries,
   convertPayloadToSubRecords,
 } from '../utils/FormatUtils';
+import { CategoryBadge } from './CategoryBadge';
 import { useLanguage } from '../i18n';
 
 interface MergeConfirmationModalProps {
@@ -75,8 +76,14 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
   });
 
   const categoryLabel =
-    payload?.mergedSummary.categoryLabel || group.categoryLabel || t('categories.mergedWorkout');
-  const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm:ss', {
+    payload?.mergedSummary.categoryLabel || group.categoryLabel || ActivityCategoryLabel.MERGED_WORKOUT;
+  const startDateFormatted = format(new Date(group.earliestStartTime), 'MMM d', {
+    locale: dateFnsLocale,
+  });
+  const startTimeFormatted = format(new Date(group.earliestStartTime), 'HH:mm:ss', {
+    locale: dateFnsLocale,
+  });
+  const endDateFormatted = format(new Date(group.latestEndTime), 'MMM d', {
     locale: dateFnsLocale,
   });
   const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm:ss', {
@@ -117,11 +124,15 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
               </Text>
 
               <View style={styles.summaryRow}>
-                <Chip icon="check-circle" style={styles.categoryChip} compact>
-                  {categoryLabel}
-                </Chip>
+                <CategoryBadge category={group.detectedCategory} label={categoryLabel} />
                 <Text variant="bodyMedium" style={styles.timeText}>
-                  {startTimeFormatted} - {endTimeFormatted}
+                  {startDateFormatted}{'\n'}{startTimeFormatted}
+                </Text>
+                <Text variant="bodyMedium" style={styles.timeText}>
+                   - 
+                </Text>
+                <Text variant="bodyMedium" style={styles.timeText}>
+                  {endDateFormatted}{'\n'}{endTimeFormatted}
                 </Text>
               </View>
 
@@ -426,12 +437,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  categoryChip: {
-    backgroundColor: '#E0F2FE',
-  },
   timeText: {
     fontWeight: '600',
     opacity: 0.8,
+    textAlign: 'center',
   },
   previewMetricsRow: {
     flexDirection: 'row',

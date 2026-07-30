@@ -108,6 +108,17 @@ export enum ActivityCategory {
   STATIONARY_NON_DISTANCE = 'STATIONARY_NON_DISTANCE',
 }
 
+export enum ActivityCategoryLabel {
+  INDOOR_TREADMILL = 'INDOOR_TREADMILL',
+  INDOOR_EQUIPMENT = 'INDOOR_EQUIPMENT',
+  OUTDOOR_GPS_TRACK = 'OUTDOOR_GPS_TRACK',
+  OUTDOOR_SPATIAL = 'OUTDOOR_SPATIAL',
+  STATIONARY_STRENGTH = 'STATIONARY_STRENGTH',
+  STATIONARY_ACTIVITY = 'STATIONARY_ACTIVITY',
+  CONFLICT = 'CONFLICT',
+  MERGED_WORKOUT = 'MERGED_WORKOUT',
+}
+
 export interface ContributingSource {
   metric: string;
   source: string;
@@ -116,7 +127,7 @@ export interface ContributingSource {
 export interface MergedWorkoutSession {
   id: string;
   detectedCategory: ActivityCategory;
-  categoryLabel: string;
+  categoryLabel: ActivityCategoryLabel;
   distanceKm: number;
   avgHeartRateBpm: number | null;
   caloriesKcal: number;
@@ -146,7 +157,7 @@ export interface WorkoutConflictGroup {
   hasMultipleExerciseTypes: boolean;
   status: 'conflict_detected' | 'merged' | 'ignored';
   detectedCategory?: ActivityCategory;
-  categoryLabel?: string;
+  categoryLabel?: ActivityCategoryLabel;
   mergedPreview?: MergedWorkoutSession;
 }
 

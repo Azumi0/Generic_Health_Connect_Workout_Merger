@@ -21,6 +21,7 @@ import {
   MergedWorkoutSession,
   ContributingSource,
   MergedWorkoutPayload,
+  ActivityCategoryLabel,
 } from '../types';
 import { generateMergedWorkoutPayload } from '../utils/MergeAlgorithm';
 import { healthConnectService } from '../services/HealthConnectService';
@@ -32,6 +33,7 @@ import {
   formatExerciseType,
 } from '../utils/FormatUtils';
 import { MergeConfirmationModal } from './MergeConfirmationModal';
+import { CategoryBadge } from './CategoryBadge';
 import { useLanguage } from '../i18n';
 
 interface SessionListProps {
@@ -46,54 +48,6 @@ interface ConflictCardProps {
   isMerging: boolean;
   onMergeGroup: (group: WorkoutConflictGroup, selectedSessionIds: string[]) => void;
 }
-
-/**
- * Render category badge based on ActivityCategory enum and categoryLabel.
- */
-const CategoryBadge: React.FC<{ category?: ActivityCategory; label?: string }> = ({ category, label }) => {
-  const theme = useTheme();
-  const { t } = useLanguage();
-
-  let icon = 'tag';
-  let backgroundColor = theme.colors.surfaceVariant;
-  let textColor = theme.colors.onSurfaceVariant;
-
-  let displayLabel = label;
-  if (category === ActivityCategory.INDOOR_MACHINE) {
-    icon = 'run-fast';
-    backgroundColor = '#E0F2FE';
-    textColor = '#0369A1';
-    if (label === 'Indoor Treadmill') displayLabel = t('categories.indoorTreadmill');
-    else if (!label || label === 'Indoor Equipment') displayLabel = t('categories.indoorEquipment');
-  } else if (category === ActivityCategory.OUTDOOR_SPATIAL) {
-    icon = 'compass';
-    backgroundColor = '#DCFCE7';
-    textColor = '#15803D';
-    if (label === 'Outdoor GPS Track') displayLabel = t('categories.outdoorGps');
-    else if (!label || label === 'Outdoor Spatial') displayLabel = t('categories.outdoorSpatial');
-  } else if (category === ActivityCategory.STATIONARY_NON_DISTANCE) {
-    icon = 'dumbbell';
-    backgroundColor = '#FFE4E6';
-    textColor = '#BE123C';
-    if (label === 'Stationary / Strength') displayLabel = t('categories.stationaryStrength');
-    else if (!label || label === 'Stationary Activity') displayLabel = t('categories.stationaryActivity');
-  }
-
-  if (!displayLabel || displayLabel === 'Conflict') {
-    displayLabel = t('categories.conflict');
-  }
-
-  return (
-    <Chip
-      icon={icon}
-      style={[styles.categoryBadge, { backgroundColor }]}
-      textStyle={[styles.categoryBadgeText, { color: textColor }]}
-      compact
-    >
-      {displayLabel}
-    </Chip>
-  );
-};
 
 /**
  * Renders metadata breakdown showing which device provided Distance vs. Heart Rate & Calories.
@@ -194,7 +148,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
   const selectedCount = selectedSessionIds.length;
 
   const category = currentPayload?.mergedSummary.detectedCategory || group.detectedCategory;
-  const categoryLabel = currentPayload?.mergedSummary.categoryLabel || group.categoryLabel || 'Conflict';
+  const categoryLabel = currentPayload?.mergedSummary.categoryLabel || group.categoryLabel || ActivityCategoryLabel.MERGED_WORKOUT;
   const sources = currentPayload?.mergedSummary.contributingSources || [];
   const mergedPreview = currentPayload?.mergedSummary;
 
@@ -619,13 +573,6 @@ const styles = StyleSheet.create({
   headerBadgeContainer: {
     marginRight: 12,
     justifyContent: 'center',
-  },
-  categoryBadge: {
-    height: 32,
-  },
-  categoryBadgeText: {
-    fontWeight: '700',
-    fontSize: 12,
   },
   typeWarningChip: {
     marginBottom: 12,

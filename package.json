@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --noEmit false --module commonjs --target es2020 --jsx react-jsx --outDir ./dist && node ./dist/utils/__tests__/testMergeAlgorithm.js && node ./dist/i18n/__tests__/testI18n.js"
+    "test": "tsc --noEmit false --module commonjs --target es2020 --jsx react-jsx --outDir ./dist && node ./dist/utils/__tests__/testMergeAlgorithm.js && node ./dist/components/__tests__/testCategoryBadge.js && node ./dist/i18n/__tests__/testI18n.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",

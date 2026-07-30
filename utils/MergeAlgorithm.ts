@@ -6,6 +6,7 @@ import {
   ActivityCategory,
   MergedWorkoutSession,
   ContributingSource,
+  ActivityCategoryLabel,
 } from '../types';
 import {
   HeartRateRecord,
@@ -84,19 +85,19 @@ const OUTDOOR_KEYWORDS = [
  */
 export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
   category: ActivityCategory;
-  label: string;
+  label: ActivityCategoryLabel;
 } {
   if (!sessions || sessions.length === 0) {
     return {
       category: ActivityCategory.STATIONARY_NON_DISTANCE,
-      label: 'Stationary / General',
+      label: ActivityCategoryLabel.STATIONARY_ACTIVITY,
     };
   }
 
   let indoorCount = 0;
   let stationaryCount = 0;
   let outdoorCount = 0;
-  let specificMachineName = '';
+  let specificMachineLabel: ActivityCategoryLabel | undefined;
 
   for (const item of sessions) {
     const exType = item.session.exerciseType;
@@ -119,15 +120,15 @@ export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
 
     if (isIndoorType) {
       indoorCount++;
-      if (!specificMachineName) {
+      if (!specificMachineLabel) {
         if (textCombined.includes('treadmill') || exType === 57 || exType === 80) {
-          specificMachineName = 'Indoor Treadmill';
+          specificMachineLabel = ActivityCategoryLabel.INDOOR_TREADMILL;
         } else if (textCombined.includes('bike') || textCombined.includes('spinning') || exType === 9) {
-          specificMachineName = 'Stationary Bike';
+          specificMachineLabel = ActivityCategoryLabel.INDOOR_EQUIPMENT;
         } else if (textCombined.includes('row') || textCombined.includes('ergometer') || exType === 54) {
-          specificMachineName = 'Rowing Machine';
+          specificMachineLabel = ActivityCategoryLabel.INDOOR_EQUIPMENT;
         } else if (textCombined.includes('elliptical') || exType === 25) {
-          specificMachineName = 'Elliptical Trainer';
+          specificMachineLabel = ActivityCategoryLabel.INDOOR_EQUIPMENT;
         }
       }
     } else if (isStationaryType) {
@@ -140,21 +141,21 @@ export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
   if (indoorCount > 0) {
     return {
       category: ActivityCategory.INDOOR_MACHINE,
-      label: specificMachineName || 'Indoor Equipment',
+      label: specificMachineLabel || ActivityCategoryLabel.INDOOR_EQUIPMENT,
     };
   }
 
   if (outdoorCount > 0) {
     return {
       category: ActivityCategory.OUTDOOR_SPATIAL,
-      label: 'Outdoor GPS Track',
+      label: ActivityCategoryLabel.OUTDOOR_GPS_TRACK,
     };
   }
 
   if (stationaryCount > 0) {
     return {
       category: ActivityCategory.STATIONARY_NON_DISTANCE,
-      label: 'Stationary / Strength',
+      label: ActivityCategoryLabel.STATIONARY_STRENGTH,
     };
   }
 
@@ -166,13 +167,13 @@ export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
   if (hasDistance) {
     return {
       category: ActivityCategory.OUTDOOR_SPATIAL,
-      label: 'Outdoor Spatial',
+      label: ActivityCategoryLabel.OUTDOOR_SPATIAL,
     };
   }
 
   return {
     category: ActivityCategory.STATIONARY_NON_DISTANCE,
-    label: 'Stationary Activity',
+    label: ActivityCategoryLabel.STATIONARY_ACTIVITY,
   };
 }
 
@@ -530,7 +531,7 @@ export function generateMergedWorkoutPayload(
   const exerciseType = sessionsToMerge[0].session.exerciseType;
 
   const existingTitle = sessionsToMerge.find((s) => s.session.title?.trim())?.session.title;
-  const title = existingTitle || `Merged Workout (${categoryLabel})`;
+  const title = existingTitle || `Merged Workout (${formatCategoryLabel(categoryLabel)})`;
 
   const notes = sessionsToMerge
     .map((s) => s.session.notes)
@@ -575,6 +576,28 @@ export function generateMergedWorkoutPayload(
 /**
  * Extracts numeric distance in meters across distance records.
  */
+function formatCategoryLabel(label: ActivityCategoryLabel): string {
+  switch (label) {
+    case ActivityCategoryLabel.INDOOR_TREADMILL:
+      return 'Indoor Treadmill';
+    case ActivityCategoryLabel.INDOOR_EQUIPMENT:
+      return 'Indoor Equipment';
+    case ActivityCategoryLabel.OUTDOOR_GPS_TRACK:
+      return 'Outdoor GPS Track';
+    case ActivityCategoryLabel.OUTDOOR_SPATIAL:
+      return 'Outdoor Spatial';
+    case ActivityCategoryLabel.STATIONARY_STRENGTH:
+      return 'Stationary / Strength';
+    case ActivityCategoryLabel.STATIONARY_ACTIVITY:
+      return 'Stationary Activity';
+    case ActivityCategoryLabel.CONFLICT:
+      return 'Conflict';
+    case ActivityCategoryLabel.MERGED_WORKOUT:
+    default:
+      return 'Merged Workout';
+  }
+}
+
 export function extractDistanceMeters(records: DistanceRecord[]): number {
   if (!records || records.length === 0) return 0;
   let totalMeters = 0;
