@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Health Connect Workout Merger",
-    "slug": "health-connect-workout-merger",
+    "slug": "generic_health_connect_workout_merger",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -127,6 +127,12 @@
         }
       ]
     ],
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "extra": {
+      "eas": {
+        "projectId": "8f0ff5f4-3dd5-4179-8fe1-8face4fcb005"
+      }
+    },
+    "owner": "azumi0s-team"
   }
 }
