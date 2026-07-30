@@ -42,7 +42,7 @@ export const pl: TranslationKeys = {
     regularGroupsHeader: 'Prawidłowe treningi',
     buttonOverlappingTab: 'Zdublowane ({count})',
     buttonStandaloneTab: 'Prawidłowe ({count})',
-    overlapCount: 'Nałożenie {total} treningów (wybrano {selected})',
+    overlapCount: 'Nałożenie {total} treningów\n(wybrano {selected})',
     mixedTypesWarning: 'Wykryto Różne Typy Ćwiczeń',
     telemetryAttribution: 'Rozstrzygnięcie Scalenia i Przypisanie Telemetrii',
     metricHierarchy: 'Hierarchia Źródeł Metryk:',

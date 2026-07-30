@@ -158,6 +158,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
         title={`${startTimeFormatted} - ${endTimeFormatted}`}
         titleStyle={styles.cardTitle}
         subtitle={t('sessionList.overlapCount', { total: group.sessions.length, selected: selectedCount })}
+        subtitleNumberOfLines={2}
         right={() => (
           <View style={styles.headerBadgeContainer}>
             <CategoryBadge category={category} label={categoryLabel} />
@@ -289,6 +290,7 @@ const StandaloneCard: React.FC<StandaloneCardProps> = ({ group }) => {
         title={session.title || exerciseTypeName}
         titleStyle={styles.cardTitle}
         subtitle={`${startTimeFormatted} - ${endTimeFormatted}`}
+        subtitleNumberOfLines={2}
         right={() => (
           <View style={styles.headerBadgeContainer}>
             <CategoryBadge category={group.detectedCategory} label={group.categoryLabel} />
