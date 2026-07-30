@@ -1,0 +1,32 @@
+name: Generate F-Droid Repository
+
+on:
+  release:
+    types: [published, created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  fdroid-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🤖 Setup F-Droid Repo Action
+        uses: fdroid/fdroid-repo-action@v1
+        with:
+          repo_name: "Health Connect Workout Merger Repo"
+          repo_icon: "assets/icon.png"
+          repo_description: "F-Droid Repository for Health Connect Workout Merger"
+
+      - name: 🚀 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./fdroid
+          publish_branch: gh-pages
