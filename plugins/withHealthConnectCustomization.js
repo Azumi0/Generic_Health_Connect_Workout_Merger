@@ -1,4 +1,4 @@
-const { withMainActivity, withAndroidManifest, createRunOncePlugin } = require('@expo/config-plugins');
+const { withMainActivity, withAndroidManifest, createRunOncePlugin } = require('expo/config-plugins');
 const pkg = require('../package.json');
 
 /**
