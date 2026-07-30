@@ -413,10 +413,12 @@ const styles = StyleSheet.create({
   warningTitle: {
     fontWeight: '700',
     color: '#991B1B',
+    textAlign: 'center',
   },
   warningText: {
     color: '#7F1D1D',
     lineHeight: 20,
+    textAlign: 'justify',
   },
   boldText: {
     fontWeight: '700',

@@ -60,13 +60,13 @@ export const pl: TranslationKeys = {
   },
   confirmationModal: {
     title: 'Potwierdź Nieodwracalne Scalanie',
-    warningTitle: 'Czy na pewno chcesz kontynuować?',
+    warningTitle: 'Czy na pewno chcesz\nkontynuować?',
     warningText:
       'Ta operacja jest nieodwracalna. Wybrane {count} oryginalnych sesji ćwiczeń zostanie trwale usuniętych z Google Health Connect i zastąpionych jedną scaloną sesją główną.',
     summaryTitle: 'Podsumowanie Scalonego Treningu',
     showDetails: 'Pokaż Szczegóły ({count} treningów i wynik)',
     hideDetails: 'Ukryj Pełne Szczegóły Treningu',
-    masterTitle: 'Główny Scalony Trening (Do Wstawienia)',
+    masterTitle: 'Główny Scalony Trening\n(Do Wstawienia)',
     finalOutputChip: 'Wynik Końcowy',
     sessionTitleLabel: 'Tytuł Sesji:',
     exerciseTypeLabel: 'Typ Ćwiczenia:',

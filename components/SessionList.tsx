@@ -137,7 +137,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
   let currentPayload: MergedWorkoutPayload | null = null;
   try {
     if (selectedSessionIds.length > 0) {
-      currentPayload = generateMergedWorkoutPayload(group, selectedSessionIds);
+      currentPayload = generateMergedWorkoutPayload(group, selectedSessionIds, { t });
     }
   } catch {
     currentPayload = null;
@@ -357,7 +357,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   // Triggered when user clicks "Merge X Workouts" button -> Opens Confirmation Modal
   const handleInitiateMergeGroup = (group: WorkoutConflictGroup, selectedSessionIds: string[]) => {
     try {
-      const payload = generateMergedWorkoutPayload(group, selectedSessionIds);
+      const payload = generateMergedWorkoutPayload(group, selectedSessionIds, { t });
       setPendingGroup(group);
       setPendingSelectedSessionIds(selectedSessionIds);
       setPendingPayload(payload);

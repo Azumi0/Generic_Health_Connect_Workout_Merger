@@ -64,7 +64,7 @@ export const en = {
     summaryTitle: 'Merged Output Summary',
     showDetails: 'Show Details ({count} Workouts & Merged Output)',
     hideDetails: 'Hide Full Workout Details',
-    masterTitle: 'Master Merged Workout (To Be Inserted)',
+    masterTitle: 'Master Merged Workout\n(To Be Inserted)',
     finalOutputChip: 'Final Output',
     sessionTitleLabel: 'Session Title:',
     exerciseTypeLabel: 'Exercise Type:',

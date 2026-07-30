@@ -147,6 +147,35 @@ describe('Workout Merger Algorithm', () => {
     expect(payload.originalSessionIdsToDelete).toHaveLength(2);
   });
 
+  it('should use the supplied translator for the merged workout title fallback', () => {
+    const noTitleSessionA = {
+      ...sessionA,
+      session: {
+        ...sessionA.session,
+        title: '',
+      },
+    } as DetailedWorkoutSession;
+
+    const noTitleSessionB = {
+      ...sessionB,
+      session: {
+        ...sessionB.session,
+        title: '',
+      },
+    } as DetailedWorkoutSession;
+
+    const conflictGroups = groupOverlappingSessions([noTitleSessionA, noTitleSessionB]);
+    const payload = generateMergedWorkoutPayload(conflictGroups[0], undefined, {
+      t: (key: string) => {
+        if (key === 'sessionList.mergedWorkoutDefaultTitle') return 'Scalony trening';
+        if (key === 'categories.indoorTreadmill') return 'Bieżnia stacjonarna';
+        return key;
+      },
+    });
+
+    expect(payload.sessionToInsert.title).toBe('Scalony trening (Bieżnia stacjonarna)');
+  });
+
   describe('FormatUtils Helpers', () => {
     it('should format exercise types correctly', () => {
       expect(formatExerciseType(57)).toBe('Treadmill Running');

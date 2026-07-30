@@ -332,9 +332,14 @@ function buildConflictGroup(
  * Pure function that generates the payload for inserting a merged master workout session
  * adhering strictly to sensor quality hierarchy, single calorie stream, and noise threshold rules.
  */
+export interface MergePayloadOptions {
+  t?: (key: string, params?: Record<string, string | number>) => string;
+}
+
 export function generateMergedWorkoutPayload(
   group: WorkoutConflictGroup,
-  selectedSessionIds?: string[]
+  selectedSessionIds?: string[] | undefined,
+  options?: MergePayloadOptions
 ): MergedWorkoutPayload {
   const sessionsToMerge = selectedSessionIds
     ? group.sessions.filter((s, index) => {
@@ -531,7 +536,8 @@ export function generateMergedWorkoutPayload(
   const exerciseType = sessionsToMerge[0].session.exerciseType;
 
   const existingTitle = sessionsToMerge.find((s) => s.session.title?.trim())?.session.title;
-  const title = existingTitle || `Merged Workout (${formatCategoryLabel(categoryLabel)})`;
+  const translate = options?.t;
+  const title = existingTitle || `${translate ? translate('sessionList.mergedWorkoutDefaultTitle') : 'Merged Workout'} (${translate ? translate(`categories.${getCategoryTranslationKey(categoryLabel)}`) : formatCategoryLabel(categoryLabel)})`;
 
   const notes = sessionsToMerge
     .map((s) => s.session.notes)
@@ -595,6 +601,28 @@ function formatCategoryLabel(label: ActivityCategoryLabel): string {
     case ActivityCategoryLabel.MERGED_WORKOUT:
     default:
       return 'Merged Workout';
+  }
+}
+
+function getCategoryTranslationKey(label: ActivityCategoryLabel): string {
+  switch (label) {
+    case ActivityCategoryLabel.INDOOR_TREADMILL:
+      return 'indoorTreadmill';
+    case ActivityCategoryLabel.INDOOR_EQUIPMENT:
+      return 'indoorEquipment';
+    case ActivityCategoryLabel.OUTDOOR_GPS_TRACK:
+      return 'outdoorGps';
+    case ActivityCategoryLabel.OUTDOOR_SPATIAL:
+      return 'outdoorSpatial';
+    case ActivityCategoryLabel.STATIONARY_STRENGTH:
+      return 'stationaryStrength';
+    case ActivityCategoryLabel.STATIONARY_ACTIVITY:
+      return 'stationaryActivity';
+    case ActivityCategoryLabel.CONFLICT:
+      return 'conflict';
+    case ActivityCategoryLabel.MERGED_WORKOUT:
+    default:
+      return 'mergedWorkout';
   }
 }
 
