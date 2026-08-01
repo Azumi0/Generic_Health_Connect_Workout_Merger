@@ -70,6 +70,11 @@ export const pl: TranslationKeys = {
     selectAtLeastOne: 'Wybierz co najmniej 2 sesje do scalenia',
     merging: 'Scalanie...',
     noWorkoutsFound: 'Nie znaleziono sesji treningowych w Health Connect.',
+    categoryOverrideLabel: 'Nadbicie Kategorii:',
+    categoryAuto: 'Auto ({cat})',
+    categoryIndoor: 'Sprzęt stacjonarny',
+    categoryOutdoor: 'Plener (GPS)',
+    categoryStationary: 'Trening stacjonarny',
   },
   confirmationModal: {
     title: 'Potwierdź Nieodwracalne Scalanie',

@@ -63,20 +63,22 @@ Insert Distance →  track UUID  →  [FAILS]  ← throws
 
 ---
 
-### 3. Majority-Vote Activity Category Detection
+### 3. Majority-Vote Activity Category Detection with Manual User Override
 
-**Problem:** Category detection used a fixed priority (indoor > outdoor > stationary). A single misclassified indoor session would override 5 legitimate outdoor sessions.
+**Problem:** Category detection originally used a fixed priority (indoor > outdoor > stationary), where a single misclassified indoor session would override 5 legitimate outdoor sessions. Additionally, automatic heuristics cannot predict 100% of user edge cases (e.g., custom workout types or mislabeled telemetry).
 
-**Decision:** Replace fixed priority with a **majority-vote** system. On ties, preserve the original priority order (indoor > outdoor > stationary) as a tie-breaker.
+**Decision:** Retain the **majority-vote** system for automated category detection (preserving the original priority order `indoor > outdoor > stationary` as a tie-breaker), while introducing a **manual override option** allowing the user to explicitly select and override the activity category prior to merging.
 
 **Rationale:**
-- The majority rule is more accurate for real-world data where one session may be misclassified by a heuristic.
+- The majority-vote rule provides reliable automated defaults for real-world data where individual sessions might be misclassified by heuristics.
 - The tie-breaker preserves backward compatibility and favors indoor classification in ambiguous cases (indoor equipment telemetry is more sensitive to misclassification — choosing the wrong distance source for a treadmill session is more impactful than for an outdoor run).
-- The implementation leverages JavaScript's guaranteed stable `Array.prototype.sort` (ES2019+, stable in V8 and Hermes) — candidates are pushed in priority order, and a descending count sort preserves insertion order for equal counts.
+- Providing an explicit manual override option gives the user final control over the classification when automated heuristics produce an undesired outcome, eliminating deadlocks or unresolvable misclassifications.
+- The implementation leverages JavaScript's guaranteed stable `Array.prototype.sort` (ES2019+, stable in V8 and Hermes) for majority counting, while the UI/payload layer accepts optional category override parameters.
 
 **Alternatives considered:**
+- Purely automated detection without user override — rejected because heuristics can occasionally misclassify complex multi-app sessions.
+- Purely manual category selection — rejected because requiring manual input on every merge increases friction unnecessarily.
 - Weighted scoring (e.g., sessions with more sub-records get higher weight) — rejected as over-engineered for the current data model.
-- Unanimous agreement required — rejected as too strict; one misclassified session would deadlock the algorithm.
 
 ---
 
@@ -269,7 +271,7 @@ WarningLogger (singleton)
 
 ### Positive
 - **Data safety:** Merge operations now have rollback protection and cascade sub-record deletion.
-- **Algorithmic accuracy:** Majority-vote category detection and guarded machine heuristic reduce misclassification.
+- **Algorithmic accuracy & user control:** Majority-vote category detection and guarded machine heuristic reduce misclassification, with manual user override support for edge cases.
 - **Observability:** SDK failures are no longer silent; users can view, export, and report warnings.
 - **Dark mode:** Full MD3 theme token compliance enables light/dark switching.
 - **Maintainability:** Canonical metric extractors, typed function signatures (no more `any`), and 31 unit tests.
@@ -284,6 +286,4 @@ WarningLogger (singleton)
 
 ## References
 
-- [CODE_REVIEW.md](../CODE_REVIEW.md) — Round 1: 30 issues identified and fixed
-- [CODE_REVIEW_ROUND_2.md](../CODE_REVIEW_ROUND_2.md) — Round 2: 7 residual issues identified and fixed
 - [INITIAL_PROMPT.md](INITIAL_PROMPT.md) — Original project specification

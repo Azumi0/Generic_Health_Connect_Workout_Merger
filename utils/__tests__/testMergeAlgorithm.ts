@@ -239,6 +239,33 @@ describe('Workout Merger Algorithm', () => {
     expect(payload.sessionToInsert.title).toBe('Scalony trening (Bieżnia stacjonarna)');
   });
 
+  it('should support manual category override in detectActivityCategory', () => {
+    const catOverrideStationary = detectActivityCategory(
+      [sessionA, sessionB],
+      ActivityCategory.STATIONARY_NON_DISTANCE
+    );
+    expect(catOverrideStationary.category).toBe(ActivityCategory.STATIONARY_NON_DISTANCE);
+    expect(catOverrideStationary.label).toBe(ActivityCategoryLabel.STATIONARY_STRENGTH);
+
+    const catOverrideOutdoor = detectActivityCategory(
+      [sessionA, sessionB],
+      ActivityCategory.OUTDOOR_SPATIAL
+    );
+    expect(catOverrideOutdoor.category).toBe(ActivityCategory.OUTDOOR_SPATIAL);
+    expect(catOverrideOutdoor.label).toBe(ActivityCategoryLabel.OUTDOOR_GPS_TRACK);
+  });
+
+  it('should apply manual category override when generating merged workout payload', () => {
+    const conflictGroups = groupOverlappingSessions([sessionA, sessionB]);
+    const payload = generateMergedWorkoutPayload(conflictGroups[0], undefined, {
+      overrideCategory: ActivityCategory.STATIONARY_NON_DISTANCE,
+    });
+    const summary = payload.mergedSummary;
+
+    expect(summary.detectedCategory).toBe(ActivityCategory.STATIONARY_NON_DISTANCE);
+    expect(summary.distanceKm).toBe(0.0);
+  });
+
   describe('FormatUtils Helpers', () => {
     it('should format exercise types correctly', () => {
       expect(formatExerciseType(57)).toBe('Treadmill Running');

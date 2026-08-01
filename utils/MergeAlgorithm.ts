@@ -97,11 +97,30 @@ const OUTDOOR_KEYWORDS = [
  * Pure function to detect Activity Category based on session metadata, exercise types, and telemetry.
  * Uses a majority-vote algorithm across all overlapping sessions in the group.
  * On a tie, indoor equipment > outdoor spatial > stationary non-distance.
+ * Supports manual user override via overrideCategory parameter.
  */
-export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
+export function detectActivityCategory(
+  sessions: DetailedWorkoutSession[],
+  overrideCategory?: ActivityCategory
+): {
   category: ActivityCategory;
   label: ActivityCategoryLabel;
 } {
+  if (overrideCategory) {
+    let label = ActivityCategoryLabel.STATIONARY_ACTIVITY;
+    if (overrideCategory === ActivityCategory.INDOOR_MACHINE) {
+      label = ActivityCategoryLabel.INDOOR_EQUIPMENT;
+    } else if (overrideCategory === ActivityCategory.OUTDOOR_SPATIAL) {
+      label = ActivityCategoryLabel.OUTDOOR_GPS_TRACK;
+    } else if (overrideCategory === ActivityCategory.STATIONARY_NON_DISTANCE) {
+      label = ActivityCategoryLabel.STATIONARY_STRENGTH;
+    }
+    return {
+      category: overrideCategory,
+      label,
+    };
+  }
+
   if (!sessions || sessions.length === 0) {
     return {
       category: ActivityCategory.STATIONARY_NON_DISTANCE,
@@ -377,6 +396,7 @@ function buildConflictGroup(
 
 export interface MergePayloadOptions {
   t?: (key: string, params?: Record<string, string | number>) => string;
+  overrideCategory?: ActivityCategory;
 }
 
 /**
@@ -405,8 +425,11 @@ export function generateMergedWorkoutPayload(
     );
   }
 
-  // 1. DETECT CATEGORY
-  const { category, label: categoryLabel } = detectActivityCategory(sessionsToMerge);
+  // 1. DETECT CATEGORY (with manual user override support)
+  const { category, label: categoryLabel } = detectActivityCategory(
+    sessionsToMerge,
+    options?.overrideCategory
+  );
 
   // 2. SELECT MASTER & SECONDARY SOURCES
   const wearableSession = sessionsToMerge.find(isWearableSession);

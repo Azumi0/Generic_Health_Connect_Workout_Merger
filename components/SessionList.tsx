@@ -47,7 +47,11 @@ interface SessionListProps {
 interface ConflictCardProps {
   group: WorkoutConflictGroup;
   isMerging: boolean;
-  onMergeGroup: (group: WorkoutConflictGroup, selectedSessionIds: string[]) => void;
+  onMergeGroup: (
+    group: WorkoutConflictGroup,
+    selectedSessionIds: string[],
+    overrideCategory?: ActivityCategory
+  ) => void;
 }
 
 /**
@@ -133,9 +137,11 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() =>
     group.sessions.map(getSessionId)
   );
+  const [overrideCategory, setOverrideCategory] = useState<ActivityCategory | null>(null);
 
   useEffect(() => {
     setSelectedSessionIds(group.sessions.map(getSessionId));
+    setOverrideCategory(null);
   }, [group]);
 
   const toggleSessionSelection = (id: string) => {
@@ -149,13 +155,16 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
   const currentPayload: MergedWorkoutPayload | null = useMemo(() => {
     try {
       if (selectedSessionIds.length >= 2) {
-        return generateMergedWorkoutPayload(group, selectedSessionIds, { t });
+        return generateMergedWorkoutPayload(group, selectedSessionIds, {
+          t,
+          overrideCategory: overrideCategory || undefined,
+        });
       }
     } catch {
       return null;
     }
     return null;
-  }, [group, selectedSessionIds, t]);
+  }, [group, selectedSessionIds, overrideCategory, t]);
 
   const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm', { locale: dateFnsLocale });
   const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm', { locale: dateFnsLocale });
@@ -165,6 +174,14 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
   const categoryLabel = currentPayload?.mergedSummary.categoryLabel || group.categoryLabel || ActivityCategoryLabel.MERGED_WORKOUT;
   const sources = currentPayload?.mergedSummary.contributingSources || [];
   const mergedPreview = currentPayload?.mergedSummary;
+
+  const autoCategoryName = group.detectedCategory
+    ? group.detectedCategory === ActivityCategory.INDOOR_MACHINE
+      ? t('sessionList.categoryIndoor')
+      : group.detectedCategory === ActivityCategory.OUTDOOR_SPATIAL
+      ? t('sessionList.categoryOutdoor')
+      : t('sessionList.categoryStationary')
+    : 'Auto';
 
   return (
     <Card style={styles.card} mode="outlined">
@@ -190,6 +207,25 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
             {t('sessionList.mixedTypesWarning')}
           </Chip>
         )}
+
+        {/* Manual Category Override Selector */}
+        <View style={styles.overrideContainer}>
+          <Text variant="labelSmall" style={[styles.overrideLabel, { color: theme.colors.outline }]}>
+            {t('sessionList.categoryOverrideLabel')}
+          </Text>
+          <SegmentedButtons
+            value={overrideCategory || 'auto'}
+            onValueChange={(val) => setOverrideCategory(val === 'auto' ? null : (val as ActivityCategory))}
+            density="small"
+            buttons={[
+              { value: 'auto', label: t('sessionList.categoryAuto', { cat: autoCategoryName }) },
+              { value: ActivityCategory.INDOOR_MACHINE, label: 'Indoor' },
+              { value: ActivityCategory.OUTDOOR_SPATIAL, label: 'Outdoor' },
+              { value: ActivityCategory.STATIONARY_NON_DISTANCE, label: 'Stationary' },
+            ]}
+            style={styles.categorySegmentedButtons}
+          />
+        </View>
 
         {/* Contributing Sources & Merged Preview Box */}
         {sources.length > 0 && (
@@ -267,7 +303,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
           icon="merge"
           loading={isMerging}
           disabled={isMerging || selectedCount < 2}
-          onPress={() => onMergeGroup(group, selectedSessionIds)}
+          onPress={() => onMergeGroup(group, selectedSessionIds, overrideCategory || undefined)}
         >
           {selectedCount < 2
             ? t('sessionList.selectAtLeastOne')
@@ -375,9 +411,16 @@ export const SessionList: React.FC<SessionListProps> = ({
   }, [groups]);
 
   // Triggered when user clicks "Merge X Workouts" button -> Opens Confirmation Modal
-  const handleInitiateMergeGroup = (group: WorkoutConflictGroup, selectedSessionIds: string[]) => {
+  const handleInitiateMergeGroup = (
+    group: WorkoutConflictGroup,
+    selectedSessionIds: string[],
+    overrideCategory?: ActivityCategory
+  ) => {
     try {
-      const payload = generateMergedWorkoutPayload(group, selectedSessionIds, { t });
+      const payload = generateMergedWorkoutPayload(group, selectedSessionIds, {
+        t,
+        overrideCategory,
+      });
       setPendingGroup(group);
       setPendingSelectedSessionIds(selectedSessionIds);
       setPendingPayload(payload);
@@ -595,6 +638,17 @@ const styles = StyleSheet.create({
   typeWarningChip: {
     marginBottom: 12,
     alignSelf: 'flex-start',
+  },
+  overrideContainer: {
+    marginBottom: 12,
+  },
+  overrideLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  categorySegmentedButtons: {
+    marginBottom: 4,
   },
   sourcesContainer: {
     borderRadius: 12,

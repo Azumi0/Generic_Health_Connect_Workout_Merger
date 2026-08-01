@@ -68,6 +68,11 @@ export const en = {
     selectAtLeastOne: 'Select at least 2 sessions to merge',
     merging: 'Merging...',
     noWorkoutsFound: 'No workout sessions were found in Health Connect.',
+    categoryOverrideLabel: 'Category Override:',
+    categoryAuto: 'Auto ({cat})',
+    categoryIndoor: 'Indoor Equipment',
+    categoryOutdoor: 'Outdoor Spatial',
+    categoryStationary: 'Stationary / Gym',
   },
   confirmationModal: {
     title: 'Confirm Irreversible Merge',
