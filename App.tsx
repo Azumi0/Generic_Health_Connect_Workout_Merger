@@ -4,6 +4,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   PaperProvider,
   MD3LightTheme,
+  MD3DarkTheme,
   Appbar,
   Button,
   Text,
@@ -24,26 +25,35 @@ import { healthConnectService } from './services/HealthConnectService';
 import { groupOverlappingSessions } from './utils/MergeAlgorithm';
 import { WorkoutConflictGroup, DetailedWorkoutSession } from './types';
 import { SessionList } from './components/SessionList';
+import { LogExportModal } from './components/LogExportModal';
 import { LanguageProvider, useLanguage, PreferenceCode } from './i18n';
+import { WarningLogger } from './services/WarningLogger';
 
 export default function AppWrapper() {
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
   return (
     <SafeAreaProvider>
       <LanguageProvider>
         <PaperProvider
-          theme={MD3LightTheme}
+          theme={isDarkMode ? MD3DarkTheme : MD3LightTheme}
           settings={{
             icon: (props) => <MaterialIcon {...props} />,
           }}
         >
-          <App />
+          <App isDarkMode={isDarkMode} onToggleDarkMode={setIsDarkMode} />
         </PaperProvider>
       </LanguageProvider>
     </SafeAreaProvider>
   );
 }
 
-function App() {
+interface AppProps {
+  isDarkMode: boolean;
+  onToggleDarkMode: (isDark: boolean) => void;
+}
+
+function App({ isDarkMode, onToggleDarkMode }: AppProps) {
   const theme = useTheme();
   const { t, preference, setPreference, systemLanguage } = useLanguage();
 
@@ -61,9 +71,18 @@ function App() {
   const [toleranceMinutes, setToleranceMinutes] = useState<number>(5);
   const [rangeDays, setRangeDays] = useState<string>('7'); // 7 days default
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
+  const [logsModalVisible, setLogsModalVisible] = useState<boolean>(false);
+  const [warningCount, setWarningCount] = useState<number>(0);
 
   const toleranceMinutesRef = useRef(toleranceMinutes);
   toleranceMinutesRef.current = toleranceMinutes;
+
+  useEffect(() => {
+    setWarningCount(WarningLogger.getLogs().length);
+    return WarningLogger.subscribe(() => {
+      setWarningCount(WarningLogger.getLogs().length);
+    });
+  }, []);
 
   /**
    * Recalculate overlap conflict groups when tolerance or sessions change
@@ -161,16 +180,21 @@ function App() {
     recalculateConflicts(rawSessions, newTolerance);
   };
 
-  // Handle merge success by updating rawSessions and recalculating conflict groups
+  // Handle merge success by updating rawSessions and recalculating conflict groups safely (N-1 fix)
   const handleMergeSuccess = (mergedGroupId: string) => {
     const targetGroup = conflictGroups.find((g) => g.id === mergedGroupId);
     if (targetGroup) {
-      const mergedSessionIds = new Set(
-        targetGroup.sessions.map((s, idx) => s.session.metadata?.id || `sess_${idx}`)
+      const targetGroupSessions = new Set(targetGroup.sessions);
+      const mergedIds = new Set(
+        targetGroup.sessions
+          .map((s) => s.session.metadata?.id)
+          .filter((id): id is string => Boolean(id))
       );
       setRawSessions((prevSessions) => {
         const updated = prevSessions.filter(
-          (s, idx) => !mergedSessionIds.has(s.session.metadata?.id || `sess_${idx}`)
+          (s) =>
+            !targetGroupSessions.has(s) &&
+            (!s.session.metadata?.id || !mergedIds.has(s.session.metadata.id))
         );
         recalculateConflicts(updated, toleranceMinutesRef.current);
         return updated;
@@ -182,13 +206,20 @@ function App() {
 
   return (
     <SafeAreaView edges={["left", "right", "bottom"]} style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
       {/* App Bar Header */}
       <Appbar.Header elevated style={{ backgroundColor: theme.colors.surface, paddingTop: 0, height: 56 }}>
         <Appbar.Content title={t('app.title')} titleStyle={styles.appTitle} />
         {hasPermissions && (
           <>
+            {warningCount > 0 && (
+              <Appbar.Action
+                icon="alert-circle-outline"
+                iconColor={theme.colors.error}
+                onPress={() => setLogsModalVisible(true)}
+              />
+            )}
             <Appbar.Action icon="tune" onPress={() => setSettingsVisible(true)} />
             <Appbar.Action icon="refresh" onPress={() => loadWorkoutSessions()} />
           </>
@@ -207,7 +238,7 @@ function App() {
             </Text>
 
             {permissionError && (
-              <Text variant="bodySmall" style={styles.errorText}>
+              <Text variant="bodySmall" style={[styles.errorText, { color: theme.colors.error }]}>
                 {permissionError}
               </Text>
             )}
@@ -268,7 +299,13 @@ function App() {
         {loadError}
       </Snackbar>
 
-      {/* Settings / Tolerance & Language Dialog */}
+      {/* Log Export Modal */}
+      <LogExportModal
+        visible={logsModalVisible}
+        onDismiss={() => setLogsModalVisible(false)}
+      />
+
+      {/* Settings / Tolerance, Language & Theme Dialog */}
       <Portal>
         <Dialog visible={settingsVisible} onDismiss={() => setSettingsVisible(false)} style={styles.dialog}>
           <Dialog.Title>{t('settings.title')}</Dialog.Title>
@@ -294,7 +331,23 @@ function App() {
 
               <Divider style={styles.settingsDivider} />
 
-              {/* Section 2: Time Tolerance */}
+              {/* Section 2: Theme Preference */}
+              <Text variant="titleSmall" style={styles.settingsSectionTitle}>
+                {t('settings.themeHeader')}
+              </Text>
+              <SegmentedButtons
+                value={isDarkMode ? 'dark' : 'light'}
+                onValueChange={(val: string) => onToggleDarkMode(val === 'dark')}
+                buttons={[
+                  { value: 'light', label: t('settings.themeLight') },
+                  { value: 'dark', label: t('settings.themeDark') },
+                ]}
+                style={{ marginTop: 8 }}
+              />
+
+              <Divider style={styles.settingsDivider} />
+
+              {/* Section 3: Time Tolerance */}
               <Text variant="titleSmall" style={styles.settingsSectionTitle}>
                 {t('settings.toleranceHeader')}
               </Text>
@@ -307,6 +360,20 @@ function App() {
                 <RadioButton.Item label={t('settings.tolerance10')} value="10" />
                 <RadioButton.Item label={t('settings.tolerance15')} value="15" />
               </RadioButton.Group>
+
+              <Divider style={styles.settingsDivider} />
+
+              {/* Section 4: System Warning Logs */}
+              <Button
+                mode="outlined"
+                icon="alert-circle-outline"
+                onPress={() => {
+                  setSettingsVisible(false);
+                  setLogsModalVisible(true);
+                }}
+              >
+                {t('settings.viewLogsButton', { count: warningCount })}
+              </Button>
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
@@ -369,7 +436,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   errorText: {
-    color: '#B00020',
     marginBottom: 12,
     textAlign: 'center',
   },

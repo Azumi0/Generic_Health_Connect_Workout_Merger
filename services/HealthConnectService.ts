@@ -1,3 +1,4 @@
+import { WarningLogger } from './WarningLogger';
 import {
   initialize,
   requestPermission,
@@ -61,6 +62,7 @@ export class HealthConnectService {
       return isInitialized;
     } catch (error) {
       console.error('[HealthConnectService] Failed to initialize Health Connect SDK:', error);
+      WarningLogger.error('[HealthConnectService] Failed to initialize SDK', error);
       return false;
     }
   }
@@ -70,16 +72,15 @@ export class HealthConnectService {
    */
   public async checkPermissions(): Promise<boolean> {
     try {
-      const grantedPermissions = await getGrantedPermissions();
-      const hasAllPermissions = REQUIRED_HEALTH_PERMISSIONS.every((req) =>
-        grantedPermissions.some(
-          (granted: any) =>
-            granted.accessType === req.accessType && granted.recordType === req.recordType
-        )
-      );
-      return hasAllPermissions;
+      if (!this.initialized) {
+        await this.initializeSDK();
+      }
+      const granted = await getGrantedPermissions();
+      const grantedTypes = new Set((granted || []).map((p) => p.recordType));
+      return REQUIRED_HEALTH_PERMISSIONS.every((req) => grantedTypes.has(req.recordType));
     } catch (error) {
       console.error('[HealthConnectService] Failed to check permissions:', error);
+      WarningLogger.error('[HealthConnectService] Failed to check permissions', error);
       throw error;
     }
   }
@@ -96,6 +97,7 @@ export class HealthConnectService {
       return (granted || []) as Permission[];
     } catch (error) {
       console.error('[HealthConnectService] Failed to request permissions:', error);
+      WarningLogger.error('[HealthConnectService] Failed to request permissions', error);
       throw error;
     }
   }
@@ -126,7 +128,8 @@ export class HealthConnectService {
         sessions.map(async (session) => {
           const subRecords = await this.fetchSubRecordsForTimeRange(
             session.startTime,
-            session.endTime
+            session.endTime,
+            session.metadata?.dataOrigin
           );
           return {
             session,
@@ -138,6 +141,7 @@ export class HealthConnectService {
       return detailedSessions;
     } catch (error) {
       console.error('[HealthConnectService] Error fetching exercise sessions:', error);
+      WarningLogger.error('[HealthConnectService] Error fetching exercise sessions', error);
       throw error;
     }
   }
@@ -147,7 +151,8 @@ export class HealthConnectService {
    */
   private async fetchSubRecordsForTimeRange(
     startTime: string,
-    endTime: string
+    endTime: string,
+    dataOrigin?: string
   ): Promise<WorkoutSubRecords> {
     const options = {
       timeRangeFilter: {
@@ -155,6 +160,7 @@ export class HealthConnectService {
         startTime,
         endTime,
       },
+      ...(dataOrigin ? { dataOriginFilter: [dataOrigin] } : {}),
     };
 
     const [
@@ -191,26 +197,36 @@ export class HealthConnectService {
       readRecords('RestingHeartRate', options),
     ]);
 
-    const getFulfilled = <T>(res: PromiseSettledResult<{ records: any[] }>): T[] => {
-      return res.status === 'fulfilled' ? (res.value.records as unknown as T[]) : [];
+    const getFulfilled = <T>(
+      res: PromiseSettledResult<{ records: any[] }>,
+      recordName: string
+    ): T[] => {
+      if (res.status === 'rejected') {
+        WarningLogger.warn(
+          `[HealthConnectService] Failed to read ${recordName} sub-records`,
+          res.reason
+        );
+        return [];
+      }
+      return (res.value.records as unknown as T[]) || [];
     };
 
     return {
-      heartRateRecords: getFulfilled<HeartRateRecord>(heartRateRes),
-      distanceRecords: getFulfilled<DistanceRecord>(distanceRes),
-      speedRecords: getFulfilled<SpeedRecord>(speedRes),
-      totalCaloriesRecords: getFulfilled<TotalCaloriesBurnedRecord>(totalCaloriesRes),
-      activeCaloriesRecords: getFulfilled<ActiveCaloriesBurnedRecord>(activeCaloriesRes),
-      stepsRecords: getFulfilled<StepsRecord>(stepsRes),
-      stepsCadenceRecords: getFulfilled<StepsCadenceRecord>(stepsCadenceRes),
-      elevationGainedRecords: getFulfilled<ElevationGainedRecord>(elevationGainedRes),
-      floorsClimbedRecords: getFulfilled<FloorsClimbedRecord>(floorsClimbedRes),
-      powerRecords: getFulfilled<PowerRecord>(powerRes),
-      cyclingPedalingCadenceRecords: getFulfilled<CyclingPedalingCadenceRecord>(cyclingPedalingCadenceRes),
-      wheelchairPushesRecords: getFulfilled<WheelchairPushesRecord>(wheelchairPushesRes),
-      vo2MaxRecords: getFulfilled<Vo2MaxRecord>(vo2MaxRes),
-      heartRateVariabilityRecords: getFulfilled<HeartRateVariabilityRmssdRecord>(heartRateVariabilityRes),
-      restingHeartRateRecords: getFulfilled<RestingHeartRateRecord>(restingHeartRateRes),
+      heartRateRecords: getFulfilled<HeartRateRecord>(heartRateRes, 'HeartRate'),
+      distanceRecords: getFulfilled<DistanceRecord>(distanceRes, 'Distance'),
+      speedRecords: getFulfilled<SpeedRecord>(speedRes, 'Speed'),
+      totalCaloriesRecords: getFulfilled<TotalCaloriesBurnedRecord>(totalCaloriesRes, 'TotalCaloriesBurned'),
+      activeCaloriesRecords: getFulfilled<ActiveCaloriesBurnedRecord>(activeCaloriesRes, 'ActiveCaloriesBurned'),
+      stepsRecords: getFulfilled<StepsRecord>(stepsRes, 'Steps'),
+      stepsCadenceRecords: getFulfilled<StepsCadenceRecord>(stepsCadenceRes, 'StepsCadence'),
+      elevationGainedRecords: getFulfilled<ElevationGainedRecord>(elevationGainedRes, 'ElevationGained'),
+      floorsClimbedRecords: getFulfilled<FloorsClimbedRecord>(floorsClimbedRes, 'FloorsClimbed'),
+      powerRecords: getFulfilled<PowerRecord>(powerRes, 'Power'),
+      cyclingPedalingCadenceRecords: getFulfilled<CyclingPedalingCadenceRecord>(cyclingPedalingCadenceRes, 'CyclingPedalingCadence'),
+      wheelchairPushesRecords: getFulfilled<WheelchairPushesRecord>(wheelchairPushesRes, 'WheelchairPushes'),
+      vo2MaxRecords: getFulfilled<Vo2MaxRecord>(vo2MaxRes, 'Vo2Max'),
+      heartRateVariabilityRecords: getFulfilled<HeartRateVariabilityRmssdRecord>(heartRateVariabilityRes, 'HeartRateVariabilityRmssd'),
+      restingHeartRateRecords: getFulfilled<RestingHeartRateRecord>(restingHeartRateRes, 'RestingHeartRate'),
     };
   }
 

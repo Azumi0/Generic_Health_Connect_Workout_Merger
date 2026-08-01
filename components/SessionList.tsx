@@ -217,7 +217,7 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
           );
 
           return (
-            <View key={sessId} style={styles.sessionItem}>
+            <View key={sessId} style={[styles.sessionItem, { borderBottomColor: theme.colors.outlineVariant }]}>
               <View style={styles.sessionRow}>
                 <Checkbox.Android
                   status={isSelected ? 'checked' : 'unchecked'}
@@ -669,7 +669,6 @@ const styles = StyleSheet.create({
   sessionItem: {
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E0E0E0',
   },
   sessionRow: {
     flexDirection: 'row',

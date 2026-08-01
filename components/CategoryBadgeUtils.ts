@@ -1,3 +1,4 @@
+import { MD3Theme } from 'react-native-paper';
 import { ActivityCategory, ActivityCategoryLabel } from '../types';
 
 export interface CategoryBadgeData {
@@ -22,28 +23,20 @@ const CATEGORY_LABEL_TRANSLATION_KEYS: Record<ActivityCategoryLabel, string> = {
 
 type CategoryBadgeConfig = {
   icon: string;
-  backgroundColor: string;
-  textColor: string;
   defaultLabelKey: string;
 };
 
 const CATEGORY_BADGE_CONFIG: Partial<Record<ActivityCategory, CategoryBadgeConfig>> = {
   [ActivityCategory.INDOOR_MACHINE]: {
     icon: 'run-fast',
-    backgroundColor: '#E0F2FE',
-    textColor: '#0369A1',
     defaultLabelKey: 'categories.indoorEquipment',
   },
   [ActivityCategory.OUTDOOR_SPATIAL]: {
     icon: 'compass',
-    backgroundColor: '#DCFCE7',
-    textColor: '#15803D',
     defaultLabelKey: 'categories.outdoorSpatial',
   },
   [ActivityCategory.STATIONARY_NON_DISTANCE]: {
     icon: 'dumbbell',
-    backgroundColor: '#FFE4E6',
-    textColor: '#BE123C',
     defaultLabelKey: 'categories.stationaryActivity',
   },
 };
@@ -51,18 +44,30 @@ const CATEGORY_BADGE_CONFIG: Partial<Record<ActivityCategory, CategoryBadgeConfi
 export function getCategoryBadgeData(
   category: ActivityCategory | undefined,
   label: ActivityCategoryLabel | undefined,
-  t: TranslationFunction
+  t: TranslationFunction,
+  theme?: MD3Theme
 ): CategoryBadgeData {
   let icon = 'tag';
-  let backgroundColor = '#F3F4F6';
-  let textColor = '#374151';
+  let backgroundColor = theme ? theme.colors.surfaceVariant : '#F3F4F6';
+  let textColor = theme ? theme.colors.onSurfaceVariant : '#374151';
 
   const categoryConfig = category ? CATEGORY_BADGE_CONFIG[category] : undefined;
 
   if (categoryConfig) {
     icon = categoryConfig.icon;
-    backgroundColor = categoryConfig.backgroundColor;
-    textColor = categoryConfig.textColor;
+  }
+
+  if (theme) {
+    if (category === ActivityCategory.INDOOR_MACHINE) {
+      backgroundColor = theme.colors.secondaryContainer;
+      textColor = theme.colors.onSecondaryContainer;
+    } else if (category === ActivityCategory.OUTDOOR_SPATIAL) {
+      backgroundColor = theme.colors.tertiaryContainer;
+      textColor = theme.colors.onTertiaryContainer;
+    } else if (category === ActivityCategory.STATIONARY_NON_DISTANCE) {
+      backgroundColor = theme.colors.primaryContainer;
+      textColor = theme.colors.onPrimaryContainer;
+    }
   }
 
   const labelTranslationKey = label ? CATEGORY_LABEL_TRANSLATION_KEYS[label] : undefined;

@@ -139,6 +139,13 @@ describe('HealthConnectService', () => {
       await expect(service.executeMerge(mockPayload)).rejects.toThrow('Distance insertion rejected by SDK');
 
       // Verify rollback calls in reverse order for inserted records
+      const deleteCalls = (HealthConnect.deleteRecordsByUuids as jest.Mock).mock.calls;
+      const hrIdx = deleteCalls.findIndex((c: any[]) => c[0] === 'HeartRate');
+      const sessIdx = deleteCalls.findIndex((c: any[]) => c[0] === 'ExerciseSession');
+      expect(hrIdx).toBeGreaterThanOrEqual(0);
+      expect(sessIdx).toBeGreaterThanOrEqual(0);
+      expect(hrIdx).toBeLessThan(sessIdx); // HeartRate rolled back before parent ExerciseSession
+
       expect(HealthConnect.deleteRecordsByUuids).toHaveBeenCalledWith('HeartRate', ['inserted_hr_uuid'], []);
       expect(HealthConnect.deleteRecordsByUuids).toHaveBeenCalledWith('ExerciseSession', ['inserted_session_uuid'], []);
     });

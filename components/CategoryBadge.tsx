@@ -16,7 +16,8 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, label })
   const { icon, backgroundColor, textColor, displayLabel } = getCategoryBadgeData(
     category,
     label,
-    t
+    t,
+    theme
   );
 
   return (

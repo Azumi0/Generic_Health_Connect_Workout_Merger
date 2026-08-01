@@ -201,7 +201,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                       <Text variant="titleMedium" style={[styles.workoutTitle, { color: theme.colors.primary }]}>
                         {t('confirmationModal.masterTitle')}
                       </Text>
-                      <Chip compact icon="check-decagram" style={styles.outputChip}>
+                      <Chip compact icon="check-decagram" style={[styles.outputChip, { backgroundColor: theme.colors.primary }]} textStyle={{ color: theme.colors.onPrimary }}>
                         {t('confirmationModal.finalOutputChip')}
                       </Chip>
                     </View>
@@ -284,7 +284,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                     <Surface key={idx} style={[styles.workoutDetailCard, { backgroundColor: theme.colors.surface }]} elevation={1}>
                       <View style={styles.workoutDetailHeader}>
                         <Text variant="titleSmall" style={styles.workoutTitle}>
-                          #{idx + 1}: {sess.title || `Exercise Session (${exTypeName})`}
+                          #{idx + 1}: {sess.title || t('confirmationModal.defaultSessionTitle', { type: exTypeName })}
                         </Text>
                         <Chip compact icon="application" style={styles.appChip}>
                           {appName}
@@ -304,12 +304,12 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
 
                         <Text variant="bodySmall" style={styles.metaRow}>
                           <Text style={styles.metaLabel}>{t('confirmationModal.packageOriginLabel')} </Text>
-                          {sess.metadata?.dataOrigin || 'Unknown'}
+                          {sess.metadata?.dataOrigin || t('confirmationModal.unknownOrigin')}
                         </Text>
 
                         <Text variant="bodySmall" style={styles.metaRow}>
                           <Text style={styles.metaLabel}>{t('confirmationModal.sessionUuidLabel')} </Text>
-                          {sess.metadata?.id || 'N/A'}
+                          {sess.metadata?.id || t('confirmationModal.notAvailable')}
                         </Text>
 
                         {sess.metadata?.clientRecordId ? (
@@ -492,9 +492,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
   },
-  outputChip: {
-    backgroundColor: '#0284C7',
-  },
+  outputChip: {},
   workoutDetailCard: {
     padding: 12,
     borderRadius: 12,
