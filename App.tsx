@@ -303,6 +303,7 @@ function App({ isDarkMode, onToggleDarkMode }: AppProps) {
       <LogExportModal
         visible={logsModalVisible}
         onDismiss={() => setLogsModalVisible(false)}
+        authorEmail='przemyslaw.wrzeszcz@gmail.com'
       />
 
       {/* Settings / Tolerance, Language & Theme Dialog */}
