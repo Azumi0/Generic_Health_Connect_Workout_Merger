@@ -15,10 +15,7 @@ on:
         type: choice
         description: "Build type to run"
         options:
-          - dev
           - prod-apk
-          - prod-aab
-          - all
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -39,7 +36,6 @@ jobs:
       - name: 🏗 Checkout repository
         uses: actions/checkout@v7
 
-      # Fix: Install pnpm before setup-node
       - name: 🏗 Setup pnpm
         uses: pnpm/action-setup@v6
         with:
@@ -55,7 +51,7 @@ jobs:
         run: pnpm install
 
       - name: 🧪 Run TypeScript check
-        run: pnpm tsc
+        run: pnpm run typecheck
 
       - name: 🧪 Run Jest Tests
         run: pnpm test
@@ -68,7 +64,6 @@ jobs:
       - name: 🏗 Checkout repository
         uses: actions/checkout@v7
 
-      # Fix: Install pnpm before setup-node
       - name: 🏗 Setup pnpm
         uses: pnpm/action-setup@v6
         with:
@@ -90,67 +85,10 @@ jobs:
           echo "EAS CLI version:"
           eas --version
 
-      - name: 📋 Fix package.json main entry
-        run: |
-          if ! command -v jq &> /dev/null; then
-            echo "Installing jq..."
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-
-          if [ -f ./package.json ]; then
-            cp package.json package.json.bak
-            jq '.main = "node_modules/expo/AppEntry.js"' package.json > package.json.tmp && mv package.json.tmp package.json
-            echo "Updated package.json main entry"
-            cat package.json | grep "main"
-          else
-            echo "package.json not found"
-            exit 1
-          fi
-
-      - name: 📋 Update metro.config.js for SVG support
-        run: |
-          if [ -f ./metro.config.js ]; then
-            echo "Creating backup of metro.config.js"
-            cp ./metro.config.js ./metro.config.js.backup
-            echo "Updating metro.config.js to CommonJS format"
-            cat > ./metro.config.js << 'EOFMARKER'
-          /* eslint-disable @typescript-eslint/no-var-requires */
-          const { getDefaultConfig } = require('expo/metro-config');
-
-          const config = getDefaultConfig(__dirname);
-
-          const { transformer, resolver } = config;
-
-          config.transformer = {
-            ...transformer,
-            babelTransformerPath: require.resolve('react-native-svg-transformer/expo'),
-          };
-
-          config.resolver = {
-            ...resolver,
-            assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
-            sourceExts: [...resolver.sourceExts, 'svg'],
-          };
-
-          module.exports = config;
-          EOFMARKER
-            echo "metro.config.js updated to CommonJS format"
-          else
-            echo "metro.config.js not found"
-          fi
-
       - name: 📱 Build Production APK
-        if: github.event.inputs.buildType == 'all' || github.event.inputs.buildType == 'prod-apk' || github.event_name == 'push'
         run: |
           export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
           eas build --platform android --profile production-apk --local --non-interactive --output=./app-prod.apk
-
-      # - name: 📱 Build Production AAB
-      #   if: github.event.inputs.buildType == 'all' || github.event.inputs.buildType == 'prod-aab' || github.event_name == 'push'
-      #   run: |
-      #     export NODE_OPTIONS="--openssl-legacy-provider --max_old_space_size=4096"
-      #     eas build --platform android --profile production --local --non-interactive --output=./app-prod.aab
-
 
       - name: 🏷️ Generate build information
         id: build-info
@@ -173,9 +111,7 @@ jobs:
           name: "Release v${{ steps.build-info.outputs.version }}-${{ steps.build-info.outputs.build_number }}"
           tag_name: "v${{ steps.build-info.outputs.version }}-${{ steps.build-info.outputs.build_number }}"
           files: |
-            ./app-dev.apk
             ./app-prod.apk
-            ./app-prod.aab
           body_path: changelog.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -185,7 +121,5 @@ jobs:
         with:
           name: app-builds
           path: |
-            ./app-dev.apk
             ./app-prod.apk
-            ./app-prod.aab
           retention-days: 7

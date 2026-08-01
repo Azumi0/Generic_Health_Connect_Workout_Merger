@@ -2,7 +2,7 @@ name: Generate F-Droid Repository
 
 on:
   release:
-    types: [published, created]
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -17,16 +17,55 @@ jobs:
       - name: 🏗 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🤖 Setup F-Droid Repo Action
-        uses: fdroid/fdroid-repo-action@v1
-        with:
-          repo_name: "Health Connect Workout Merger Repo"
-          repo_icon: "assets/icon.png"
-          repo_description: "F-Droid Repository for Health Connect Workout Merger"
+      - name: 📦 Install fdroidserver
+        run: |
+          sudo add-apt-repository -y ppa:fdroid/fdroidserver
+          sudo apt-get update
+          sudo apt-get install -y fdroidserver
+
+      - name: 🔑 Restore signing keystore
+        run: |
+          mkdir -p fdroid
+          echo "${{ secrets.FDROID_KEYSTORE_BASE64 }}" | base64 -d > fdroid/keystore.p12
+
+      - name: 📝 Write F-Droid config
+        run: |
+          cat > fdroid/config.yml << 'EOF'
+          repo_url: https://azumi0.github.io/Generic_Health_Connect_Workout_Merger/repo
+          repo_name: Health Connect Workout Merger
+          repo_description: >-
+            F-Droid repository for Health Connect Workout Merger.
+            Merge overlapping workout sessions from multiple fitness apps.
+          repo_icon: icon.png
+          archive_older: 0
+          keystore: keystore.p12
+          keystorepass: $FDROID_KEYSTORE_PASS
+          keypass: $FDROID_KEY_PASS
+          keydname: CN=F-Droid Repo, OU=F-Droid
+          EOF
+
+      - name: 📥 Download Release APKs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p fdroid/repo
+          gh release download --pattern "*.apk" --dir fdroid/repo || echo "No APK found in release"
+          # Copy icon for the repo
+          cp assets/icon.png fdroid/repo/icon.png 2>/dev/null || true
+
+      - name: 🤖 Build F-Droid Index
+        env:
+          ANDROID_HOME: /usr/lib/android-sdk
+          FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+          FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
+        run: |
+          cd fdroid
+          fdroid update --create-metadata --verbose
 
       - name: 🚀 Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./fdroid
+          publish_dir: ./fdroid/repo
           publish_branch: gh-pages
+          force_orphan: true

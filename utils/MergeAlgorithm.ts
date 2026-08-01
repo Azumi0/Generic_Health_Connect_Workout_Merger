@@ -7,8 +7,10 @@ import {
   MergedWorkoutSession,
   ContributingSource,
   ActivityCategoryLabel,
+  WorkoutSubRecords,
 } from '../types';
 import {
+  RecordType,
   HeartRateRecord,
   DistanceRecord,
   SpeedRecord,
@@ -26,6 +28,17 @@ import {
   RestingHeartRateRecord,
 } from 'react-native-health-connect';
 import { formatAppOrigin } from './FormatUtils';
+import {
+  extractDistanceMeters,
+  extractCaloriesKcal,
+  extractAvgHeartRateBpm,
+} from './MetricExtractors';
+
+export {
+  extractDistanceMeters,
+  extractCaloriesKcal,
+  extractAvgHeartRateBpm,
+} from './MetricExtractors';
 
 export const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes tolerance
 
@@ -82,6 +95,8 @@ const OUTDOOR_KEYWORDS = [
 
 /**
  * Pure function to detect Activity Category based on session metadata, exercise types, and telemetry.
+ * Uses a majority-vote algorithm across all overlapping sessions in the group.
+ * On a tie, indoor equipment > outdoor spatial > stationary non-distance.
  */
 export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
   category: ActivityCategory;
@@ -138,24 +153,41 @@ export function detectActivityCategory(sessions: DetailedWorkoutSession[]): {
     }
   }
 
+  // Majority-vote: pick the category with the most matching sessions.
+  // On a tie, prefer indoor > outdoor > stationary.
+  const candidates: Array<{
+    count: number;
+    category: ActivityCategory;
+    label: ActivityCategoryLabel;
+  }> = [];
+
   if (indoorCount > 0) {
-    return {
+    candidates.push({
+      count: indoorCount,
       category: ActivityCategory.INDOOR_MACHINE,
       label: specificMachineLabel || ActivityCategoryLabel.INDOOR_EQUIPMENT,
-    };
+    });
   }
-
   if (outdoorCount > 0) {
-    return {
+    candidates.push({
+      count: outdoorCount,
       category: ActivityCategory.OUTDOOR_SPATIAL,
       label: ActivityCategoryLabel.OUTDOOR_GPS_TRACK,
-    };
+    });
   }
-
   if (stationaryCount > 0) {
-    return {
+    candidates.push({
+      count: stationaryCount,
       category: ActivityCategory.STATIONARY_NON_DISTANCE,
       label: ActivityCategoryLabel.STATIONARY_STRENGTH,
+    });
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.count - a.count);
+    return {
+      category: candidates[0].category,
+      label: candidates[0].label,
     };
   }
 
@@ -205,8 +237,12 @@ export function isWearableSession(s: DetailedWorkoutSession): boolean {
 
 /**
  * Checks if a session originates from an equipment telemetry machine app (Treadmill, Stationary Bike, Rower).
+ * @param groupCategory Optional category detected for the group to gate distance-without-HR fallback.
  */
-export function isMachineSession(s: DetailedWorkoutSession): boolean {
+export function isMachineSession(
+  s: DetailedWorkoutSession,
+  groupCategory?: ActivityCategory
+): boolean {
   const origin = (s.session.metadata?.dataOrigin || '').toLowerCase();
   const title = (s.session.title || '').toLowerCase();
   const knownMachinePackages = [
@@ -231,7 +267,12 @@ export function isMachineSession(s: DetailedWorkoutSession): boolean {
   const hasDistance = s.subRecords.distanceRecords && s.subRecords.distanceRecords.length > 0;
   const noHeartRate = !s.subRecords.heartRateRecords || s.subRecords.heartRateRecords.length === 0;
 
-  return isMachineApp || isMachineTitle || (hasDistance && noHeartRate);
+  // Only apply the distance-without-HR fallback if the group is classified as indoor machine.
+  // Otherwise a phone-only outdoor run (no HR sensor) would be misclassified as a machine.
+  const distanceFallback =
+    groupCategory === ActivityCategory.INDOOR_MACHINE && hasDistance && noHeartRate;
+
+  return isMachineApp || isMachineTitle || distanceFallback;
 }
 
 /**
@@ -287,6 +328,7 @@ export function groupOverlappingSessions(
 
 /**
  * Constructs a WorkoutConflictGroup structure with category label and merged preview.
+ * Group IDs incorporate sorted constituent session IDs to ensure uniqueness.
  */
 function buildConflictGroup(
   sessions: DetailedWorkoutSession[],
@@ -300,8 +342,13 @@ function buildConflictGroup(
 
   const { category, label: categoryLabel } = detectActivityCategory(sessions);
 
+  const sessionIdPart = sessions
+    .map((s, i) => s.session.metadata?.id || `idx${i}`)
+    .sort()
+    .join('_');
+
   const tempGroup: WorkoutConflictGroup = {
-    id: `group_${earliestTimeMs}_${latestTimeMs}_${sessions.length}`,
+    id: `group_${earliestTimeMs}_${latestTimeMs}_${sessionIdPart}`,
     sessions,
     earliestStartTime: new Date(earliestTimeMs).toISOString(),
     latestEndTime: new Date(latestTimeMs).toISOString(),
@@ -328,14 +375,14 @@ function buildConflictGroup(
   };
 }
 
-/**
- * Pure function that generates the payload for inserting a merged master workout session
- * adhering strictly to sensor quality hierarchy, single calorie stream, and noise threshold rules.
- */
 export interface MergePayloadOptions {
   t?: (key: string, params?: Record<string, string | number>) => string;
 }
 
+/**
+ * Pure function that generates the payload for inserting a merged master workout session
+ * adhering strictly to sensor quality hierarchy, single calorie stream, and noise threshold rules.
+ */
 export function generateMergedWorkoutPayload(
   group: WorkoutConflictGroup,
   selectedSessionIds?: string[] | undefined,
@@ -352,12 +399,18 @@ export function generateMergedWorkoutPayload(
     throw new Error('Cannot merge an empty selection of workouts');
   }
 
+  if (sessionsToMerge.length === 1) {
+    throw new Error(
+      'Cannot merge a single workout session. Select at least 2 sessions to merge.'
+    );
+  }
+
   // 1. DETECT CATEGORY
   const { category, label: categoryLabel } = detectActivityCategory(sessionsToMerge);
 
   // 2. SELECT MASTER & SECONDARY SOURCES
   const wearableSession = sessionsToMerge.find(isWearableSession);
-  const machineSession = sessionsToMerge.find(isMachineSession);
+  const machineSession = sessionsToMerge.find((s) => isMachineSession(s, category));
 
   let masterCalorieSession: DetailedWorkoutSession = wearableSession || sessionsToMerge[0];
   let masterDistanceSession: DetailedWorkoutSession | null = sessionsToMerge[0];
@@ -399,10 +452,13 @@ export function generateMergedWorkoutPayload(
       wearableDistKm = wearableDistMeters / 1000;
     }
 
-    // Noise Threshold Rule: Discard wearable distance if < 0.10 km or < 10% of machine distance
+    // Indoor Machine Telemetry Rule:
+    // Discard wearable wrist-accelerometer distance if it is < 0.10 km or < 10% of machine belt distance (noise).
+    // If wearable distance is significantly higher than machine distance (> 1.5x), the wearable has GPS lock (outdoor).
     if (wearableDistKm > 0 && (wearableDistKm < 0.10 || wearableDistKm < 0.10 * machineDistKm)) {
-      // Discard wearable distance (wrist noise), keep Machine belt telemetry distance
       rawDistance = masterDistanceSession.subRecords.distanceRecords || [];
+    } else if (wearableDistKm > machineDistKm * 1.5 && wearableSession?.subRecords.distanceRecords) {
+      rawDistance = wearableSession.subRecords.distanceRecords;
     } else if (masterDistanceSession.subRecords.distanceRecords.length > 0) {
       rawDistance = masterDistanceSession.subRecords.distanceRecords;
     } else if (wearableSession?.subRecords.distanceRecords) {
@@ -432,8 +488,6 @@ export function generateMergedWorkoutPayload(
     masterDistanceSession?.subRecords.elevationGainedRecords &&
     masterDistanceSession.subRecords.elevationGainedRecords.length > 0
   ) {
-    // Treadmill Equipment Telemetry takes priority for incline elevation gain
-    // (smartwatch barometers cannot measure inclination when room altitude is static).
     rawElevationGained.push(...masterDistanceSession.subRecords.elevationGainedRecords);
   } else {
     for (const item of sessionsToMerge) {
@@ -537,7 +591,9 @@ export function generateMergedWorkoutPayload(
 
   const existingTitle = sessionsToMerge.find((s) => s.session.title?.trim())?.session.title;
   const translate = options?.t;
-  const title = existingTitle || `${translate ? translate('sessionList.mergedWorkoutDefaultTitle') : 'Merged Workout'} (${translate ? translate(`categories.${getCategoryTranslationKey(categoryLabel)}`) : formatCategoryLabel(categoryLabel)})`;
+  const title =
+    existingTitle ||
+    `${translate ? translate('sessionList.mergedWorkoutDefaultTitle') : 'Merged Workout'} (${translate ? translate(`categories.${getCategoryTranslationKey(categoryLabel)}`) : formatCategoryLabel(categoryLabel)})`;
 
   const notes = sessionsToMerge
     .map((s) => s.session.notes)
@@ -556,6 +612,44 @@ export function generateMergedWorkoutPayload(
   const originalSessionIdsToDelete = sessionsToMerge
     .map((s) => s.session.metadata?.id)
     .filter((id): id is string => Boolean(id));
+
+  // Collect sub-record UUIDs to delete from original sessions
+  const subRecordMap: Array<{ key: keyof WorkoutSubRecords; recordType: RecordType }> = [
+    { key: 'heartRateRecords', recordType: 'HeartRate' },
+    { key: 'distanceRecords', recordType: 'Distance' },
+    { key: 'speedRecords', recordType: 'Speed' },
+    { key: 'totalCaloriesRecords', recordType: 'TotalCaloriesBurned' },
+    { key: 'activeCaloriesRecords', recordType: 'ActiveCaloriesBurned' },
+    { key: 'stepsRecords', recordType: 'Steps' },
+    { key: 'stepsCadenceRecords', recordType: 'StepsCadence' },
+    { key: 'elevationGainedRecords', recordType: 'ElevationGained' },
+    { key: 'floorsClimbedRecords', recordType: 'FloorsClimbed' },
+    { key: 'powerRecords', recordType: 'Power' },
+    { key: 'cyclingPedalingCadenceRecords', recordType: 'CyclingPedalingCadence' },
+    { key: 'wheelchairPushesRecords', recordType: 'WheelchairPushes' },
+    { key: 'vo2MaxRecords', recordType: 'Vo2Max' },
+    { key: 'heartRateVariabilityRecords', recordType: 'HeartRateVariabilityRmssd' },
+    { key: 'restingHeartRateRecords', recordType: 'RestingHeartRate' },
+  ];
+
+  const originalSubRecordIdsToDelete: Array<{ recordType: RecordType; uuids: string[] }> = [];
+
+  for (const { key, recordType } of subRecordMap) {
+    const uuids = new Set<string>();
+    for (const s of sessionsToMerge) {
+      const recs = s.subRecords[key] as Array<{ metadata?: { id?: string } }> | undefined;
+      if (recs) {
+        for (const r of recs) {
+          if (r.metadata?.id) {
+            uuids.add(r.metadata.id);
+          }
+        }
+      }
+    }
+    if (uuids.size > 0) {
+      originalSubRecordIdsToDelete.push({ recordType, uuids: Array.from(uuids) });
+    }
+  }
 
   return {
     mergedSummary,
@@ -576,11 +670,13 @@ export function generateMergedWorkoutPayload(
     heartRateVariabilityToInsert,
     restingHeartRateToInsert,
     originalSessionIdsToDelete,
+    originalSubRecordIdsToDelete,
   };
 }
 
 /**
- * Extracts numeric distance in meters across distance records.
+ * Converts an ActivityCategoryLabel enum value to a human-readable English string.
+ * Used as a fallback when no translation function (`t`) is available.
  */
 function formatCategoryLabel(label: ActivityCategoryLabel): string {
   switch (label) {
@@ -604,6 +700,10 @@ function formatCategoryLabel(label: ActivityCategoryLabel): string {
   }
 }
 
+/**
+ * Maps an ActivityCategoryLabel to its corresponding i18n translation key
+ * (e.g., `INDOOR_TREADMILL` -> `'indoorTreadmill'`), for use with the `t()` function.
+ */
 function getCategoryTranslationKey(label: ActivityCategoryLabel): string {
   switch (label) {
     case ActivityCategoryLabel.INDOOR_TREADMILL:
@@ -626,101 +726,26 @@ function getCategoryTranslationKey(label: ActivityCategoryLabel): string {
   }
 }
 
-export function extractDistanceMeters(records: DistanceRecord[]): number {
-  if (!records || records.length === 0) return 0;
-  let totalMeters = 0;
-  for (const rec of records) {
-    if (!rec.distance) continue;
-    const dist = rec.distance as any;
-    if (typeof dist.inMeters === 'number') {
-      totalMeters += dist.inMeters;
-    } else if (typeof dist.inKilometers === 'number') {
-      totalMeters += dist.inKilometers * 1000;
-    } else if (typeof dist.value === 'number') {
-      if (dist.unit === 'kilometers') {
-        totalMeters += dist.value * 1000;
-      } else if (dist.unit === 'miles') {
-        totalMeters += dist.value * 1609.34;
-      } else {
-        totalMeters += dist.value;
-      }
-    }
-  }
-  return totalMeters;
-}
-
 /**
- * Extracts numeric energy burned in kilocalories (kcal).
+ * Strips metadata and deduplicates Health Connect records by origin package and timestamp/ID key.
  */
-export function extractCaloriesKcal(
-  totalCalRecords: TotalCaloriesBurnedRecord[],
-  activeCalRecords?: ActiveCaloriesBurnedRecord[]
-): number {
-  let totalKcal = 0;
-  const recordsToUse =
-    totalCalRecords && totalCalRecords.length > 0
-      ? totalCalRecords
-      : activeCalRecords || [];
-
-  for (const rec of recordsToUse) {
-    if (!rec.energy) continue;
-    const energy = rec.energy as any;
-    if (typeof energy.inKilocalories === 'number') {
-      totalKcal += energy.inKilocalories;
-    } else if (typeof energy.inCalories === 'number') {
-      totalKcal += energy.inCalories / 1000;
-    } else if (typeof energy.value === 'number') {
-      if (energy.unit === 'kilocalories' || energy.unit === 'kcal') {
-        totalKcal += energy.value;
-      } else if (energy.unit === 'calories') {
-        totalKcal += energy.value / 1000;
-      } else {
-        totalKcal += energy.value;
-      }
-    }
-  }
-  return totalKcal;
-}
-
-/**
- * Extracts average heart rate in BPM.
- */
-export function extractAvgHeartRateBpm(records: HeartRateRecord[]): number | null {
-  if (!records || records.length === 0) return null;
-  let totalBpm = 0;
-  let count = 0;
-
-  for (const rec of records) {
-    if (rec.samples && Array.isArray(rec.samples)) {
-      for (const sample of rec.samples) {
-        if (typeof sample.beatsPerMinute === 'number' && sample.beatsPerMinute > 0) {
-          totalBpm += sample.beatsPerMinute;
-          count++;
-        }
-      }
-    }
-  }
-
-  return count > 0 ? Math.round(totalBpm / count) : null;
-}
-
-/**
- * Strips metadata and deduplicates Health Connect records by timestamp key.
- */
-function deduplicateRecords<T extends { metadata?: any }>(
+export function deduplicateRecords<T extends { metadata?: any }>(
   records: T[]
 ): Omit<T, 'metadata'>[] {
   const seenKeys = new Set<string>();
   const result: Omit<T, 'metadata'>[] = [];
 
   for (const rec of records) {
+    const origin = (rec as any).metadata?.dataOrigin || 'unknown';
+    const id = (rec as any).metadata?.id;
     const timeKey =
       (rec as any).startTime && (rec as any).endTime
         ? `${(rec as any).startTime}_${(rec as any).endTime}`
         : `${(rec as any).time}`;
+    const dedupKey = id ? id : `${origin}_${timeKey}`;
 
-    if (!seenKeys.has(timeKey)) {
-      seenKeys.add(timeKey);
+    if (!seenKeys.has(dedupKey)) {
+      seenKeys.add(dedupKey);
       const { metadata, ...cleanRecord } = rec;
       result.push(cleanRecord as Omit<T, 'metadata'>);
     }

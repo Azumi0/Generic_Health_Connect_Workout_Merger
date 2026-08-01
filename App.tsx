@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, View, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import {
   PaperProvider,
-  MD3DarkTheme,
   MD3LightTheme,
   Appbar,
   Button,
@@ -15,6 +14,7 @@ import {
   RadioButton,
   Divider,
   useTheme,
+  Snackbar,
 } from 'react-native-paper';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -55,11 +55,15 @@ function App() {
   const [rawSessions, setRawSessions] = useState<DetailedWorkoutSession[]>([]);
   const [conflictGroups, setConflictGroups] = useState<WorkoutConflictGroup[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Time tolerance state (in minutes)
   const [toleranceMinutes, setToleranceMinutes] = useState<number>(5);
   const [rangeDays, setRangeDays] = useState<string>('7'); // 7 days default
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
+
+  const toleranceMinutesRef = useRef(toleranceMinutes);
+  toleranceMinutesRef.current = toleranceMinutes;
 
   /**
    * Recalculate overlap conflict groups when tolerance or sessions change
@@ -80,6 +84,7 @@ function App() {
   const loadWorkoutSessions = useCallback(
     async (targetRangeDays?: string) => {
       setLoading(true);
+      setLoadError(null);
       try {
         const daysStr = typeof targetRangeDays === 'string' ? targetRangeDays : rangeDays;
         const days = parseInt(daysStr, 10) || 7;
@@ -93,14 +98,15 @@ function App() {
         );
 
         setRawSessions(sessions);
-        recalculateConflicts(sessions, toleranceMinutes);
+        recalculateConflicts(sessions, toleranceMinutesRef.current);
       } catch (error: any) {
         console.error('Failed to load workout sessions:', error);
+        setLoadError(error.message || t('permissions.sdkError'));
       } finally {
         setLoading(false);
       }
     },
-    [rangeDays, toleranceMinutes, recalculateConflicts]
+    [rangeDays, recalculateConflicts, t]
   );
 
   /**
@@ -155,9 +161,23 @@ function App() {
     recalculateConflicts(rawSessions, newTolerance);
   };
 
-  // Remove merged group locally upon merge success
+  // Handle merge success by updating rawSessions and recalculating conflict groups
   const handleMergeSuccess = (mergedGroupId: string) => {
-    setConflictGroups((prev: WorkoutConflictGroup[]) => prev.filter((g: WorkoutConflictGroup) => g.id !== mergedGroupId));
+    const targetGroup = conflictGroups.find((g) => g.id === mergedGroupId);
+    if (targetGroup) {
+      const mergedSessionIds = new Set(
+        targetGroup.sessions.map((s, idx) => s.session.metadata?.id || `sess_${idx}`)
+      );
+      setRawSessions((prevSessions) => {
+        const updated = prevSessions.filter(
+          (s, idx) => !mergedSessionIds.has(s.session.metadata?.id || `sess_${idx}`)
+        );
+        recalculateConflicts(updated, toleranceMinutesRef.current);
+        return updated;
+      });
+    } else {
+      setConflictGroups((prev) => prev.filter((g) => g.id !== mergedGroupId));
+    }
   };
 
   return (
@@ -228,11 +248,25 @@ function App() {
           <SessionList
             groups={conflictGroups}
             loading={loading}
+            rangeDays={rangeDays}
             onRefresh={loadWorkoutSessions}
             onMergeSuccess={handleMergeSuccess}
           />
         </View>
       )}
+
+      {/* Load Error Snackbar */}
+      <Snackbar
+        visible={loadError !== null}
+        onDismiss={() => setLoadError(null)}
+        duration={5000}
+        action={{
+          label: t('app.refresh'),
+          onPress: () => loadWorkoutSessions(),
+        }}
+      >
+        {loadError}
+      </Snackbar>
 
       {/* Settings / Tolerance & Language Dialog */}
       <Portal>

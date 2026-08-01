@@ -20,19 +20,10 @@ import type {
 } from 'react-native-health-connect';
 
 /**
- * List of all Health Connect record types supported by react-native-health-connect.
+ * List of Health Connect record types used by the application for workout merging.
  */
-const ALL_HEALTH_RECORD_TYPES: RecordType[] = [
+const USED_HEALTH_RECORD_TYPES: RecordType[] = [
   'ActiveCaloriesBurned',
-  'BasalBodyTemperature',
-  'BasalMetabolicRate',
-  'BloodGlucose',
-  'BloodPressure',
-  'BodyFat',
-  'BodyTemperature',
-  'BodyWaterMass',
-  'BoneMass',
-  'CervicalMucus',
   'CyclingPedalingCadence',
   'Distance',
   'ElevationGained',
@@ -40,33 +31,20 @@ const ALL_HEALTH_RECORD_TYPES: RecordType[] = [
   'FloorsClimbed',
   'HeartRate',
   'HeartRateVariabilityRmssd',
-  'Height',
-  'Hydration',
-  'IntermenstrualBleeding',
-  'LeanBodyMass',
-  'MenstruationFlow',
-  'MenstruationPeriod',
-  'Nutrition',
-  'OvulationTest',
-  'OxygenSaturation',
   'Power',
-  'RespiratoryRate',
   'RestingHeartRate',
-  'SexualActivity',
-  'SleepSession',
   'Speed',
   'Steps',
   'StepsCadence',
   'TotalCaloriesBurned',
   'Vo2Max',
-  'Weight',
   'WheelchairPushes',
 ];
 
 /**
- * Comprehensive Health Connect permissions required by the application.
+ * Health Connect permissions required by the application.
  */
-export const REQUIRED_HEALTH_PERMISSIONS: Permission[] = ALL_HEALTH_RECORD_TYPES.flatMap(
+export const REQUIRED_HEALTH_PERMISSIONS: Permission[] = USED_HEALTH_RECORD_TYPES.flatMap(
   (recordType) => [
     { accessType: 'read', recordType },
     { accessType: 'write', recordType },
@@ -183,4 +161,5 @@ export interface MergedWorkoutPayload {
   heartRateVariabilityToInsert: Omit<HeartRateVariabilityRmssdRecord, 'metadata'>[];
   restingHeartRateToInsert: Omit<RestingHeartRateRecord, 'metadata'>[];
   originalSessionIdsToDelete: string[];
+  originalSubRecordIdsToDelete?: Array<{ recordType: RecordType; uuids: string[] }>;
 }

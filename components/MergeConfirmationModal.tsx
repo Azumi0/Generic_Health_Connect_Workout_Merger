@@ -105,20 +105,29 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
         <Dialog.ScrollArea style={styles.scrollArea}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {/* Irreversible Warning Box */}
-            <Surface style={styles.warningBox} elevation={0}>
+            <Surface
+              style={[
+                styles.warningBox,
+                { backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error },
+              ]}
+              elevation={0}
+            >
               <View style={styles.warningHeader}>
-                <IconButton icon="alert" iconColor="#DC2626" size={24} style={styles.warningIcon} />
-                <Text variant="titleMedium" style={styles.warningTitle}>
+                <IconButton icon="alert" iconColor={theme.colors.error} size={24} style={styles.warningIcon} />
+                <Text variant="titleMedium" style={[styles.warningTitle, { color: theme.colors.onErrorContainer }]}>
                   {t('confirmationModal.warningTitle')}
                 </Text>
               </View>
-              <Text variant="bodyMedium" style={styles.warningText}>
+              <Text variant="bodyMedium" style={[styles.warningText, { color: theme.colors.onErrorContainer }]}>
                 {t('confirmationModal.warningText', { count: selectedSessions.length })}
               </Text>
             </Surface>
 
             {/* High Level Summary Card */}
-            <Surface style={styles.summaryCard} elevation={1}>
+            <Surface
+              style={[styles.summaryCard, { backgroundColor: theme.colors.surfaceVariant }]}
+              elevation={1}
+            >
               <Text variant="labelLarge" style={[styles.sectionTitle, { color: theme.colors.primary }]}>
                 {t('confirmationModal.summaryTitle')}
               </Text>
@@ -137,21 +146,21 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
               </View>
 
               {mergedSummary && (
-                <View style={styles.previewMetricsRow}>
+                <View style={[styles.previewMetricsRow, { backgroundColor: theme.colors.surface }]}>
                   <View style={styles.previewMetricItem}>
                     <Text variant="labelSmall" style={styles.metricLabel}>{t('metrics.distance')}</Text>
                     <Text variant="titleMedium" style={styles.metricValue}>
                       {mergedSummary.distanceKm > 0 ? `${mergedSummary.distanceKm} km` : '0.00 km'}
                     </Text>
                   </View>
-                  <View style={styles.metricDivider} />
+                  <View style={[styles.metricDivider, { backgroundColor: theme.colors.outlineVariant }]} />
                   <View style={styles.previewMetricItem}>
                     <Text variant="labelSmall" style={styles.metricLabel}>{t('metrics.avgHrShort')}</Text>
                     <Text variant="titleMedium" style={styles.metricValue}>
                       {mergedSummary.avgHeartRateBpm ? `${mergedSummary.avgHeartRateBpm} bpm` : '--'}
                     </Text>
                   </View>
-                  <View style={styles.metricDivider} />
+                  <View style={[styles.metricDivider, { backgroundColor: theme.colors.outlineVariant }]} />
                   <View style={styles.previewMetricItem}>
                     <Text variant="labelSmall" style={styles.metricLabel}>{t('metrics.calories')}</Text>
                     <Text variant="titleMedium" style={styles.metricValue}>
@@ -181,9 +190,15 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
 
                 {/* SECTION 1: FINAL MERGED OUTPUT METADATA */}
                 {payload && (
-                  <Surface style={styles.mergedOutputDetailCard} elevation={2}>
+                  <Surface
+                    style={[
+                      styles.mergedOutputDetailCard,
+                      { backgroundColor: theme.colors.secondaryContainer, borderColor: theme.colors.primary },
+                    ]}
+                    elevation={2}
+                  >
                     <View style={styles.workoutDetailHeader}>
-                      <Text variant="titleMedium" style={[styles.workoutTitle, { color: '#0369A1' }]}>
+                      <Text variant="titleMedium" style={[styles.workoutTitle, { color: theme.colors.primary }]}>
                         {t('confirmationModal.masterTitle')}
                       </Text>
                       <Chip compact icon="check-decagram" style={styles.outputChip}>
@@ -191,7 +206,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                       </Chip>
                     </View>
 
-                    <View style={styles.metadataGrid}>
+                    <View style={[styles.metadataGrid, { backgroundColor: theme.colors.surface }]}>
                       <Text variant="bodySmall" style={styles.metaRow}>
                         <Text style={styles.metaLabel}>{t('confirmationModal.sessionTitleLabel')} </Text>
                         {payload.sessionToInsert.title || t('confirmationModal.mergedWorkoutDefaultTitle')}
@@ -238,7 +253,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                             variant="bodySmall"
                             style={[
                               styles.subRecordName,
-                              { color: sub.count > 0 ? '#0369A1' : theme.colors.outline },
+                              { color: sub.count > 0 ? theme.colors.primary : theme.colors.outline },
                             ]}
                           >
                             • {sub.name}:
@@ -266,7 +281,7 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                   const subSummaries = getSubRecordSummaries(item.subRecords, t);
 
                   return (
-                    <Surface key={idx} style={styles.workoutDetailCard} elevation={1}>
+                    <Surface key={idx} style={[styles.workoutDetailCard, { backgroundColor: theme.colors.surface }]} elevation={1}>
                       <View style={styles.workoutDetailHeader}>
                         <Text variant="titleSmall" style={styles.workoutTitle}>
                           #{idx + 1}: {sess.title || `Exercise Session (${exTypeName})`}
@@ -276,9 +291,9 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                         </Chip>
                       </View>
 
-                      <View style={styles.metadataGrid}>
+                      <View style={[styles.metadataGrid, { backgroundColor: theme.colors.surfaceVariant }]}>
                         <Text variant="bodySmall" style={styles.metaRow}>
-                          <Text style={styles.metaLabel}>Time Window: </Text>
+                          <Text style={styles.metaLabel}>{t('confirmationModal.timeWindowLabel')} </Text>
                           {sessStart} - {sessEnd}
                         </Text>
 
@@ -288,32 +303,32 @@ export const MergeConfirmationModal: React.FC<MergeConfirmationModalProps> = ({
                         </Text>
 
                         <Text variant="bodySmall" style={styles.metaRow}>
-                          <Text style={styles.metaLabel}>Package Origin: </Text>
+                          <Text style={styles.metaLabel}>{t('confirmationModal.packageOriginLabel')} </Text>
                           {sess.metadata?.dataOrigin || 'Unknown'}
                         </Text>
 
                         <Text variant="bodySmall" style={styles.metaRow}>
-                          <Text style={styles.metaLabel}>Session UUID: </Text>
+                          <Text style={styles.metaLabel}>{t('confirmationModal.sessionUuidLabel')} </Text>
                           {sess.metadata?.id || 'N/A'}
                         </Text>
 
                         {sess.metadata?.clientRecordId ? (
                           <Text variant="bodySmall" style={styles.metaRow}>
-                            <Text style={styles.metaLabel}>Client Record ID: </Text>
+                            <Text style={styles.metaLabel}>{t('confirmationModal.clientRecordIdLabel')} </Text>
                             {sess.metadata.clientRecordId}
                           </Text>
                         ) : null}
 
                         {sess.metadata?.lastModifiedTime ? (
                           <Text variant="bodySmall" style={styles.metaRow}>
-                            <Text style={styles.metaLabel}>Last Modified: </Text>
+                            <Text style={styles.metaLabel}>{t('confirmationModal.lastModifiedLabel')} </Text>
                             {format(new Date(sess.metadata.lastModifiedTime), 'yyyy-MM-dd HH:mm:ss')}
                           </Text>
                         ) : null}
 
                         {sess.notes ? (
                           <Text variant="bodySmall" style={styles.metaRow}>
-                            <Text style={styles.metaLabel}>Notes: </Text>
+                            <Text style={styles.metaLabel}>{t('confirmationModal.notesLabel')} </Text>
                             {sess.notes}
                           </Text>
                         ) : null}
@@ -394,8 +409,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   warningBox: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
@@ -412,21 +425,15 @@ const styles = StyleSheet.create({
   },
   warningTitle: {
     fontWeight: '700',
-    color: '#991B1B',
     textAlign: 'center',
   },
   warningText: {
-    color: '#7F1D1D',
     lineHeight: 20,
     textAlign: 'justify',
-  },
-  boldText: {
-    fontWeight: '700',
   },
   summaryCard: {
     padding: 14,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
     marginBottom: 16,
   },
   sectionTitle: {
@@ -448,7 +455,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     paddingVertical: 8,
     borderRadius: 8,
   },
@@ -465,7 +471,6 @@ const styles = StyleSheet.create({
   metricDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#E2E8F0',
   },
   detailsToggleButton: {
     marginVertical: 4,
@@ -485,8 +490,6 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
     marginBottom: 16,
-    backgroundColor: '#F0F9FF',
-    borderColor: '#BAE6FD',
     borderWidth: 1,
   },
   outputChip: {
@@ -496,7 +499,6 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     marginBottom: 12,
-    backgroundColor: '#FFFFFF',
   },
   workoutDetailHeader: {
     flexDirection: 'row',
@@ -513,7 +515,6 @@ const styles = StyleSheet.create({
     height: 28,
   },
   metadataGrid: {
-    backgroundColor: '#F1F5F9',
     padding: 10,
     borderRadius: 8,
     marginBottom: 8,

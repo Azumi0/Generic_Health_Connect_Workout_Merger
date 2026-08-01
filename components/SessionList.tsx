@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import {
   Card,
@@ -39,6 +39,7 @@ import { useLanguage } from '../i18n';
 interface SessionListProps {
   groups: WorkoutConflictGroup[];
   loading: boolean;
+  rangeDays: string;
   onRefresh: () => void;
   onMergeSuccess: (groupId: string) => void;
 }
@@ -60,27 +61,38 @@ const ContributingSourcesView: React.FC<{
   const { t } = useLanguage();
 
   return (
-    <Surface style={styles.sourcesContainer} elevation={0}>
+    <Surface
+      style={[
+        styles.sourcesContainer,
+        { backgroundColor: theme.colors.surfaceVariant, borderColor: theme.colors.outlineVariant },
+      ]}
+      elevation={0}
+    >
       <Text variant="labelMedium" style={[styles.sourcesHeaderTitle, { color: theme.colors.primary }]}>
         {t('sessionList.telemetryAttribution')}
       </Text>
 
       {mergedPreview && (
-        <View style={styles.previewMetricsRow}>
+        <View
+          style={[
+            styles.previewMetricsRow,
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.outlineVariant },
+          ]}
+        >
           <View style={styles.previewMetricItem}>
             <Text variant="bodySmall" style={styles.previewMetricLabel}>{t('metrics.distance')}</Text>
             <Text variant="titleMedium" style={styles.previewMetricValue}>
               {mergedPreview.distanceKm > 0 ? `${mergedPreview.distanceKm} km` : '0.00 km'}
             </Text>
           </View>
-          <View style={styles.previewMetricDivider} />
+          <View style={[styles.previewMetricDivider, { backgroundColor: theme.colors.outlineVariant }]} />
           <View style={styles.previewMetricItem}>
             <Text variant="bodySmall" style={styles.previewMetricLabel}>{t('metrics.avgHeartRate')}</Text>
             <Text variant="titleMedium" style={styles.previewMetricValue}>
               {mergedPreview.avgHeartRateBpm ? `${mergedPreview.avgHeartRateBpm} bpm` : '--'}
             </Text>
           </View>
-          <View style={styles.previewMetricDivider} />
+          <View style={[styles.previewMetricDivider, { backgroundColor: theme.colors.outlineVariant }]} />
           <View style={styles.previewMetricItem}>
             <Text variant="bodySmall" style={styles.previewMetricLabel}>{t('metrics.calories')}</Text>
             <Text variant="titleMedium" style={styles.previewMetricValue}>
@@ -97,11 +109,11 @@ const ContributingSourcesView: React.FC<{
       </Text>
       <View style={styles.sourcesChipList}>
         {sources.map((cs, idx) => (
-          <View key={idx} style={styles.sourcePill}>
-            <Text variant="labelSmall" style={styles.sourceMetricName}>
+          <View key={idx} style={[styles.sourcePill, { backgroundColor: theme.colors.secondaryContainer }]}>
+            <Text variant="labelSmall" style={[styles.sourceMetricName, { color: theme.colors.onSecondaryContainer }]}>
               {cs.metric}:
             </Text>
-            <Text variant="bodySmall" style={styles.sourceAppName}>
+            <Text variant="bodySmall" style={[styles.sourceAppName, { color: theme.colors.onSecondaryContainer }]}>
               {cs.source}
             </Text>
           </View>
@@ -134,14 +146,16 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
     }
   };
 
-  let currentPayload: MergedWorkoutPayload | null = null;
-  try {
-    if (selectedSessionIds.length > 0) {
-      currentPayload = generateMergedWorkoutPayload(group, selectedSessionIds, { t });
+  const currentPayload: MergedWorkoutPayload | null = useMemo(() => {
+    try {
+      if (selectedSessionIds.length >= 2) {
+        return generateMergedWorkoutPayload(group, selectedSessionIds, { t });
+      }
+    } catch {
+      return null;
     }
-  } catch {
-    currentPayload = null;
-  }
+    return null;
+  }, [group, selectedSessionIds, t]);
 
   const startTimeFormatted = format(new Date(group.earliestStartTime), 'MMM d, HH:mm', { locale: dateFnsLocale });
   const endTimeFormatted = format(new Date(group.latestEndTime), 'HH:mm', { locale: dateFnsLocale });
@@ -167,7 +181,12 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
       />
       <Card.Content>
         {group.hasMultipleExerciseTypes && (
-          <Chip compact icon="alert-decagram" style={styles.typeWarningChip}>
+          <Chip
+            compact
+            icon="alert-decagram"
+            style={[styles.typeWarningChip, { backgroundColor: theme.colors.errorContainer }]}
+            textStyle={{ color: theme.colors.onErrorContainer }}
+          >
             {t('sessionList.mixedTypesWarning')}
           </Chip>
         )}
@@ -226,13 +245,13 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
 
                   <View style={styles.badgeRow}>
                     <Chip compact icon="heart-pulse" style={styles.metricBadge}>
-                      HR: {hrVal}
+                      {t('metrics.hrChip', { val: hrVal })}
                     </Chip>
                     <Chip compact icon="map-marker-distance" style={styles.metricBadge}>
-                      Dist: {distVal}
+                      {t('metrics.distChip', { val: distVal })}
                     </Chip>
                     <Chip compact icon="fire" style={styles.metricBadge}>
-                      Cal: {calVal}
+                      {t('metrics.calChip', { val: calVal })}
                     </Chip>
                   </View>
                 </View>
@@ -247,10 +266,10 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ group, isMerging, onMergeGr
           mode="contained"
           icon="merge"
           loading={isMerging}
-          disabled={isMerging || selectedCount < 1}
+          disabled={isMerging || selectedCount < 2}
           onPress={() => onMergeGroup(group, selectedSessionIds)}
         >
-          {selectedCount < 1
+          {selectedCount < 2
             ? t('sessionList.selectAtLeastOne')
             : t('sessionList.mergeSelected', { count: selectedCount })}
         </Button>
@@ -310,13 +329,13 @@ const StandaloneCard: React.FC<StandaloneCardProps> = ({ group }) => {
 
         <View style={styles.badgeRow}>
           <Chip compact icon="heart-pulse" style={styles.metricBadge}>
-            HR: {hrVal}
+            {t('metrics.hrChip', { val: hrVal })}
           </Chip>
           <Chip compact icon="map-marker-distance" style={styles.metricBadge}>
-            Dist: {distVal}
+            {t('metrics.distChip', { val: distVal })}
           </Chip>
           <Chip compact icon="fire" style={styles.metricBadge}>
-            Cal: {calVal}
+            {t('metrics.calChip', { val: calVal })}
           </Chip>
         </View>
       </Card.Content>
@@ -327,6 +346,7 @@ const StandaloneCard: React.FC<StandaloneCardProps> = ({ group }) => {
 export const SessionList: React.FC<SessionListProps> = ({
   groups,
   loading,
+  rangeDays,
   onRefresh,
   onMergeSuccess,
 }) => {
@@ -412,7 +432,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         <View style={styles.statsRow}>
           <View>
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              {t('sessionList.conflictGroupsHeader')} 
+              {t('sessionList.conflictGroupsHeader')}
             </Text>
             <Text
               variant="headlineMedium"
@@ -424,7 +444,7 @@ export const SessionList: React.FC<SessionListProps> = ({
 
           <View>
             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              {t('sessionList.regularGroupsHeader')} 
+              {t('sessionList.regularGroupsHeader')}
             </Text>
             <Text variant="headlineMedium">{cleanSessions.length}</Text>
           </View>
@@ -461,7 +481,7 @@ export const SessionList: React.FC<SessionListProps> = ({
             <IconButton icon="check-decagram" size={64} iconColor={theme.colors.primary} />
             <Text variant="titleLarge">{t('sessionList.emptyTitle')}</Text>
             <Text variant="bodyMedium" style={styles.emptySubtitle}>
-              {t('sessionList.emptySubtitle', { days: '7' })}
+              {t('sessionList.emptySubtitle', { days: rangeDays })}
             </Text>
             <Button mode="outlined" style={{ marginTop: 16 }} onPress={onRefresh}>
               {t('sessionList.rescanButton')}
@@ -561,10 +581,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  sectionHeader: {
-    marginBottom: 12,
-    fontWeight: '600',
-  },
   card: {
     marginBottom: 16,
     borderRadius: 16,
@@ -579,15 +595,12 @@ const styles = StyleSheet.create({
   typeWarningChip: {
     marginBottom: 12,
     alignSelf: 'flex-start',
-    backgroundColor: '#FFDCC3',
   },
   sourcesContainer: {
-    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   sourcesHeaderTitle: {
     fontWeight: '700',
@@ -597,11 +610,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   previewMetricItem: {
     flex: 1,
@@ -618,7 +629,6 @@ const styles = StyleSheet.create({
   previewMetricDivider: {
     width: 1,
     height: '80%',
-    backgroundColor: '#E2E8F0',
   },
   sourceDivider: {
     marginVertical: 10,
@@ -637,7 +647,6 @@ const styles = StyleSheet.create({
   sourcePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EDF2F7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -645,11 +654,9 @@ const styles = StyleSheet.create({
   sourceMetricName: {
     fontWeight: '700',
     marginRight: 4,
-    color: '#475569',
   },
   sourceAppName: {
     fontWeight: '500',
-    color: '#0F172A',
   },
   divider: {
     marginVertical: 10,
@@ -716,4 +723,3 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 });
-

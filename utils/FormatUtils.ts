@@ -3,7 +3,24 @@ import {
   DistanceRecord,
   TotalCaloriesBurnedRecord,
   ActiveCaloriesBurnedRecord,
+  SpeedRecord,
+  StepsRecord,
+  StepsCadenceRecord,
+  ElevationGainedRecord,
+  FloorsClimbedRecord,
+  PowerRecord,
+  CyclingPedalingCadenceRecord,
+  WheelchairPushesRecord,
+  Vo2MaxRecord,
+  HeartRateVariabilityRmssdRecord,
+  RestingHeartRateRecord,
 } from 'react-native-health-connect';
+import {
+  extractDistanceMeters,
+  extractCaloriesKcal,
+  extractAvgHeartRateBpm,
+} from './MetricExtractors';
+import { WorkoutSubRecords, MergedWorkoutPayload } from '../types';
 
 /**
  * Known Android package name mappings to friendly app names.
@@ -21,7 +38,7 @@ const KNOWN_APP_ORIGINS: Record<string, string> = {
   'com.zwift.zwiftgame': 'Zwift',
   'com.underarmour.fitness.record': 'MapMyRun',
   'com.polar.flow': 'Polar Flow',
-  'com.suunto.sunntox': 'Suunto',
+  'com.suunto.suuntox': 'Suunto',
   'com.xiaomi.hm.health': 'Zepp / Mi Fitness',
   'com.huami.watch.hmwatchmanager': 'Zepp',
   'com.komoot.androidapp': 'Komoot',
@@ -64,24 +81,9 @@ export function formatAppOrigin(
  * Returns formatted string like "142 bpm" or "--".
  */
 export function calculateAvgHeartRate(records: HeartRateRecord[]): string {
-  if (!records || records.length === 0) return '--';
-
-  let totalBpm = 0;
-  let count = 0;
-
-  for (const rec of records) {
-    if (rec.samples && Array.isArray(rec.samples)) {
-      for (const sample of rec.samples) {
-        if (typeof sample.beatsPerMinute === 'number' && sample.beatsPerMinute > 0) {
-          totalBpm += sample.beatsPerMinute;
-          count++;
-        }
-      }
-    }
-  }
-
-  if (count === 0) return '--';
-  return `${Math.round(totalBpm / count)} bpm`;
+  const avg = extractAvgHeartRateBpm(records);
+  if (avg === null) return '--';
+  return `${avg} bpm`;
 }
 
 /**
@@ -90,26 +92,7 @@ export function calculateAvgHeartRate(records: HeartRateRecord[]): string {
  */
 export function calculateTotalDistance(records: DistanceRecord[]): string {
   if (!records || records.length === 0) return '--';
-
-  let totalMeters = 0;
-  for (const rec of records) {
-    if (!rec.distance) continue;
-    const dist = rec.distance as any;
-    if (typeof dist.inMeters === 'number') {
-      totalMeters += dist.inMeters;
-    } else if (typeof dist.inKilometers === 'number') {
-      totalMeters += dist.inKilometers * 1000;
-    } else if (typeof dist.value === 'number') {
-      if (dist.unit === 'kilometers') {
-        totalMeters += dist.value * 1000;
-      } else if (dist.unit === 'miles') {
-        totalMeters += dist.value * 1609.34;
-      } else {
-        totalMeters += dist.value;
-      }
-    }
-  }
-
+  const totalMeters = extractDistanceMeters(records);
   return `${(totalMeters / 1000).toFixed(2)} km`;
 }
 
@@ -121,8 +104,6 @@ export function calculateTotalCalories(
   totalCalRecords: TotalCaloriesBurnedRecord[],
   activeCalRecords?: ActiveCaloriesBurnedRecord[]
 ): string {
-  let totalKcal = 0;
-
   const recordsToUse =
     totalCalRecords && totalCalRecords.length > 0
       ? totalCalRecords
@@ -130,24 +111,7 @@ export function calculateTotalCalories(
 
   if (recordsToUse.length === 0) return '--';
 
-  for (const rec of recordsToUse) {
-    if (!rec.energy) continue;
-    const energy = rec.energy as any;
-    if (typeof energy.inKilocalories === 'number') {
-      totalKcal += energy.inKilocalories;
-    } else if (typeof energy.inCalories === 'number') {
-      totalKcal += energy.inCalories / 1000;
-    } else if (typeof energy.value === 'number') {
-      if (energy.unit === 'kilocalories' || energy.unit === 'kcal') {
-        totalKcal += energy.value;
-      } else if (energy.unit === 'calories') {
-        totalKcal += energy.value / 1000;
-      } else {
-        totalKcal += energy.value;
-      }
-    }
-  }
-
+  const totalKcal = extractCaloriesKcal(totalCalRecords, activeCalRecords);
   if (totalKcal === 0) return '--';
   return `${Math.round(totalKcal)} kcal`;
 }
@@ -287,7 +251,7 @@ export interface MetricDetailSummary {
  * Returns a list of all sub-record metric metadata summaries for a given workout sub-records collection.
  */
 export function getSubRecordSummaries(
-  subRecords?: any,
+  subRecords?: Partial<WorkoutSubRecords>,
   t?: (key: string, params?: Record<string, string | number>) => string
 ): MetricDetailSummary[] {
   if (!subRecords) return [];
@@ -499,23 +463,41 @@ export function getSubRecordSummaries(
  * Converts a MergedWorkoutPayload sub-records arrays into a WorkoutSubRecords structure
  * compatible with getSubRecordSummaries.
  */
-export function convertPayloadToSubRecords(payload?: any): any {
-  if (!payload) return {};
+export function convertPayloadToSubRecords(payload?: MergedWorkoutPayload): WorkoutSubRecords {
+  if (!payload) {
+    return {
+      heartRateRecords: [],
+      distanceRecords: [],
+      speedRecords: [],
+      totalCaloriesRecords: [],
+      activeCaloriesRecords: [],
+      stepsRecords: [],
+      stepsCadenceRecords: [],
+      elevationGainedRecords: [],
+      floorsClimbedRecords: [],
+      powerRecords: [],
+      cyclingPedalingCadenceRecords: [],
+      wheelchairPushesRecords: [],
+      vo2MaxRecords: [],
+      heartRateVariabilityRecords: [],
+      restingHeartRateRecords: [],
+    };
+  }
   return {
-    heartRateRecords: payload.heartRateToInsert || [],
-    distanceRecords: payload.distanceToInsert || [],
-    speedRecords: payload.speedToInsert || [],
-    totalCaloriesRecords: payload.totalCaloriesToInsert || [],
-    activeCaloriesRecords: payload.activeCaloriesToInsert || [],
-    stepsRecords: payload.stepsToInsert || [],
-    stepsCadenceRecords: payload.stepsCadenceToInsert || [],
-    elevationGainedRecords: payload.elevationGainedToInsert || [],
-    floorsClimbedRecords: payload.floorsClimbedToInsert || [],
-    powerRecords: payload.powerToInsert || [],
-    cyclingPedalingCadenceRecords: payload.cyclingPedalingCadenceToInsert || [],
-    wheelchairPushesRecords: payload.wheelchairPushesToInsert || [],
-    vo2MaxRecords: payload.vo2MaxToInsert || [],
-    heartRateVariabilityRecords: payload.heartRateVariabilityToInsert || [],
-    restingHeartRateRecords: payload.restingHeartRateToInsert || [],
+    heartRateRecords: (payload.heartRateToInsert || []) as HeartRateRecord[],
+    distanceRecords: (payload.distanceToInsert || []) as DistanceRecord[],
+    speedRecords: (payload.speedToInsert || []) as SpeedRecord[],
+    totalCaloriesRecords: (payload.totalCaloriesToInsert || []) as TotalCaloriesBurnedRecord[],
+    activeCaloriesRecords: (payload.activeCaloriesToInsert || []) as ActiveCaloriesBurnedRecord[],
+    stepsRecords: (payload.stepsToInsert || []) as StepsRecord[],
+    stepsCadenceRecords: (payload.stepsCadenceToInsert || []) as StepsCadenceRecord[],
+    elevationGainedRecords: (payload.elevationGainedToInsert || []) as ElevationGainedRecord[],
+    floorsClimbedRecords: (payload.floorsClimbedToInsert || []) as FloorsClimbedRecord[],
+    powerRecords: (payload.powerToInsert || []) as PowerRecord[],
+    cyclingPedalingCadenceRecords: (payload.cyclingPedalingCadenceToInsert || []) as CyclingPedalingCadenceRecord[],
+    wheelchairPushesRecords: (payload.wheelchairPushesToInsert || []) as WheelchairPushesRecord[],
+    vo2MaxRecords: (payload.vo2MaxToInsert || []) as Vo2MaxRecord[],
+    heartRateVariabilityRecords: (payload.heartRateVariabilityToInsert || []) as HeartRateVariabilityRmssdRecord[],
+    restingHeartRateRecords: (payload.restingHeartRateToInsert || []) as RestingHeartRateRecord[],
   };
 }
