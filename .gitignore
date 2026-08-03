@@ -46,3 +46,7 @@ Thumbs.db
 *.aab
 *.keystore
 *.jks
+
+*.p12
+*.jks
+*.keystore
