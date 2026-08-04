@@ -99,10 +99,22 @@ jobs:
           echo "repo_keyalias: $repo_keyalias" >> config.yml
           fdroid update --create-metadata --verbose
 
+      - name: 📄 Stage site (root redirect + repo under /repo)
+        run: |
+          rm -rf fdroid/site
+          mkdir -p fdroid/site/repo
+          cp -a fdroid/repo/. fdroid/site/repo/
+          printf '%s\n' '<!DOCTYPE html>' '<html lang="en">' '<head><meta charset="utf-8">' \
+            '<meta http-equiv="refresh" content="0; url=./repo/">' \
+            '<title>F-Droid Repository</title></head>' \
+            '<body><p>F-Droid repository for Health Connect Workout Merger. Redirecting to <a href="./repo/">./repo/</a>.</p></body></html>' \
+            > fdroid/site/index.html
+
       - name: 🚀 Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./fdroid/repo
+          publish_dir: ./fdroid/site
+          destination_dir: .
           publish_branch: gh-pages
           force_orphan: true
