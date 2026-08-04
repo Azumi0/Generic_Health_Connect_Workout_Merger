@@ -68,10 +68,11 @@ jobs:
           repo_icon: icon.png
           archive_older: 0
           keystore: keystore.p12
-          keystorepass: $FDROID_KEYSTORE_PASS
-          keypass: $FDROID_KEY_PASS
+          keystorepass: {env: FDROID_KEYSTORE_PASS}
+          keypass: {env: FDROID_KEY_PASS}
           keydname: CN=F-Droid Repo, OU=F-Droid
           EOF
+          chmod 600 fdroid/config.yml
 
       - name: 📥 Download Release APKs
         env:
@@ -89,6 +90,13 @@ jobs:
           FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
         run: |
           cd fdroid
+          repo_keyalias=$(keytool -list -keystore keystore.p12 -storetype PKCS12 -storepass "$FDROID_KEYSTORE_PASS" 2>/dev/null | awk -F', ' '/PrivateKeyEntry/ {print $1; exit}')
+          if [ -z "$repo_keyalias" ]; then
+            echo "::error::Failed to detect repo_keyalias from keystore.p12"
+            keytool -list -keystore keystore.p12 -storetype PKCS12 -storepass "$FDROID_KEYSTORE_PASS" 2>&1 || true
+            exit 1
+          fi
+          echo "repo_keyalias: $repo_keyalias" >> config.yml
           fdroid update --create-metadata --verbose
 
       - name: 🚀 Deploy to GitHub Pages
