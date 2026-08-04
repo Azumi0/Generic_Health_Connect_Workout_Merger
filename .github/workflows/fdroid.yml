@@ -15,13 +15,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🏗 Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 📦 Install fdroidserver
         run: |
           sudo add-apt-repository -y ppa:fdroid/fdroidserver
           sudo apt-get update
           sudo apt-get install -y fdroidserver
+
+      - name: 🩹 Patch androguard (tolerate non-zero res0/res1 fields)
+        run: |
+          sudo python3 - <<'EOF'
+          path = "/usr/lib/python3/dist-packages/androguard/core/bytecodes/axml/__init__.py"
+          with open(path) as f:
+              lines = f.readlines()
+
+          out = []
+          changed = 0
+          for line in lines:
+              if 'raise ResParserError("res0 must be zero!")' in line:
+                  out.append('            pass  # tolerate non-zero reserved field\n')
+                  changed += 1
+              elif 'raise ResParserError("res1 must be zero!")' in line:
+                  out.append('            pass  # tolerate non-zero reserved field\n')
+                  changed += 1
+              else:
+                  out.append(line)
+
+          if changed != 2:
+              raise SystemExit(
+                  "ERROR: expected to patch res0/res1 ResParserError raises in %s, matched %d" % (path, changed)
+              )
+
+          with open(path, "w") as f:
+              f.writelines(out)
+          print("Patched androguard to tolerate non-zero res0/res1 reserved fields")
+          EOF
 
       - name: 🔑 Restore signing keystore
         run: |
@@ -50,8 +79,8 @@ jobs:
         run: |
           mkdir -p fdroid/repo
           gh release download --pattern "*.apk" --dir fdroid/repo || echo "No APK found in release"
-          # Copy icon for the repo
-          cp assets/icon.png fdroid/repo/icon.png 2>/dev/null || true
+          # Copy repo icon into the fdroid working dir (fdroidserver publishes it under repo/icons/)
+          cp assets/icon.png fdroid/icon.png 2>/dev/null || true
 
       - name: 🤖 Build F-Droid Index
         env:
